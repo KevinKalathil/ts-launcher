@@ -5,12 +5,16 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import android.app.AppOpsManager
+import android.os.Process
+import android.util.Log
 
 data class AppInfo(
     val packageName: String,
@@ -99,6 +103,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             .queryIntentActivities(intent, PackageManager.MATCH_ALL)
             .mapNotNull { resolveInfo ->
                 val pkg = resolveInfo.activityInfo.packageName
+                Log.d("kevin", pkg)
                 // Skip our own launcher from the list
                 if (pkg == context.packageName) return@mapNotNull null
 
@@ -114,4 +119,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 }
             }
     }
+
+    fun hasUsagePermission(): Boolean {
+
+        val appOps = context
+            .getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+
+        val mode = appOps.checkOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName
+        )
+
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
 }
