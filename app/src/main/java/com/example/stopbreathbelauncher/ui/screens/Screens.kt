@@ -1,12 +1,10 @@
 package com.example.stopbreathbelauncher.ui.screens
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -17,53 +15,87 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 
-@OptIn(ExperimentalFoundationApi::class) // <--- Add this line here
+/**
+ * Top 10 screen
+ * Sorted by usage time (descending), then alphabetically by label
+ */
 @Composable
-fun AppsScreen(
+fun TopTenScreen(
     apps: List<AppInfo>,
     disabledApps: Set<String>,
-    onAppClick: (AppInfo) -> Unit,
-    onDisableToggle: (AppInfo) -> Unit
+    onAppClick: (AppInfo) -> Unit
 ) {
+    // Sort: highest usage first, then A-Z for ties
+    val sortedApps = remember(apps) {
+        apps.sortedWith(
+            compareByDescending<AppInfo> { it.usageTimeMs }
+                .thenBy { it.label.lowercase() }
+        ).take(10) // Ensure it's limited to 10
+    }
 
-    val topApps = remember(apps) { apps.take(10) }
+    AppListScreen(
+        title = "Top 10 Apps",
+        apps = sortedApps,
+        disabledApps = disabledApps,
+        onAppClick = onAppClick
+    )
+}
+
+/**
+ * All apps screen
+ * Sorted alphabetically by label
+ */
+@Composable
+fun AllAppsScreen(
+    apps: List<AppInfo>,
+    disabledApps: Set<String>,
+    onAppClick: (AppInfo) -> Unit
+) {
+    // Sort: A-Z
+    val sortedApps = remember(apps) {
+        apps.sortedBy { it.label.lowercase() }
+    }
+
+    AppListScreen(
+        title = "All Apps",
+        apps = sortedApps,
+        disabledApps = disabledApps,
+        onAppClick = onAppClick
+    )
+}
+
+/**
+ * Shared screen layout
+ */
+@Composable
+private fun AppListScreen(
+    title: String,
+    apps: List<AppInfo>,
+    disabledApps: Set<String>,
+    onAppClick: (AppInfo) -> Unit
+) {
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
 
-        stickyHeader {
-            SectionHeader("Top 10 Most Used")
+        item {
+            SectionHeader(title)
         }
 
-        itemsIndexed(topApps, key = { _, it -> "top_${it.packageName}" }) { index, app ->
+        items(
+            items = apps,
+            key = { it.packageName }
+        ) { app ->
+
             AppRow(
-                rank = index + 1,
                 app = app,
                 isDisabled = disabledApps.contains(app.packageName),
-                onClick = { onAppClick(app) },
-                onLongClick = { onDisableToggle(app) }
-            )
-        }
-
-        stickyHeader {
-            SectionHeader("All Apps")
-        }
-
-        items(apps, key = { it.packageName }) { app ->
-            AppRow(
-                rank = null,
-                app = app,
-                isDisabled = disabledApps.contains(app.packageName),
-                onClick = { onAppClick(app) },
-                onLongClick = {}
+                onClick = { onAppClick(app) }
             )
         }
 
@@ -73,8 +105,11 @@ fun AppsScreen(
     }
 }
 
+/**
+ * Section header
+ */
 @Composable
-fun SectionHeader(title: String) {
+private fun SectionHeader(title: String) {
 
     Box(
         modifier = Modifier
@@ -88,41 +123,30 @@ fun SectionHeader(title: String) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * Single app row
+ */
 @Composable
-fun AppRow(
-    rank: Int?,
+private fun AppRow(
     app: AppInfo,
     isDisabled: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onClick: () -> Unit
 ) {
+
+    val bitmap = remember(app.packageName) {
+        app.icon.toBitmap(96, 96).asImageBitmap()
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
+            .clickable(
+                onClick = onClick
             )
             .alpha(if (isDisabled) 0.4f else 1f)
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
-        if (rank != null) {
-            Text(
-                text = "$rank",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.width(28.dp)
-            )
-        } else {
-            Spacer(modifier = Modifier.width(28.dp))
-        }
-
-        val bitmap = remember(app.packageName) {
-            app.icon.toBitmap(96, 96).asImageBitmap()
-        }
 
         Image(
             bitmap = bitmap,
@@ -158,6 +182,9 @@ fun AppRow(
     }
 }
 
+/**
+ * Usage time formatter
+ */
 fun formatUsageTime(ms: Long): String {
 
     if (ms == 0L) return "No usage today"
