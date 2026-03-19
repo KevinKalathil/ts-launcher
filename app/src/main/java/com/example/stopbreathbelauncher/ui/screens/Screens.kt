@@ -11,9 +11,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.example.stopbreathbelauncher.ui.scroll.LineWheelScroll
 import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
 
 /**
@@ -76,32 +79,36 @@ private fun AppListScreen(
     onAppClick: (AppInfo) -> Unit
 ) {
 
-    LazyColumn(
+    var selectedIndex by remember { mutableStateOf(0) }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(horizontal = 32.dp)
     ) {
 
-        item {
-            SectionHeader(title)
+        SectionHeader(title)
+
+        Box(
+            modifier = Modifier
+                .weight(1f)   // this gives LineWheelScroll full remaining height
+        ) {
+
+            LineWheelScroll(
+                items = apps,
+                selectedIndex = selectedIndex,
+                onItemSelected = { selectedIndex = it }
+            ) { app, isFocused ->
+
+                AppRow(
+                    app = app,
+                    isDisabled = disabledApps.contains(app.packageName),
+                    onClick = { onAppClick(app) }
+                )
+            }
         }
 
-        items(
-            items = apps,
-            key = { it.packageName }
-        ) { app ->
-
-            AppRow(
-                app = app,
-                isDisabled = disabledApps.contains(app.packageName),
-                onClick = { onAppClick(app) }
-            )
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(32.dp))
-        }
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -144,7 +151,7 @@ private fun AppRow(
                 onClick = onClick
             )
             .alpha(if (isDisabled) 0.4f else 1f)
-            .padding(vertical = 10.dp),
+            .padding(vertical = 10.dp).padding(end = 48.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
 

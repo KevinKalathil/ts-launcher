@@ -43,6 +43,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
 
     // Compose BOM — controls all compose library versions consistently
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))
