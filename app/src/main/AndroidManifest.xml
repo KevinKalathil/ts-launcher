@@ -3,10 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.stopbreathbelauncher">
 
-    <!-- Required permissions -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions"
-        xmlns:tools="http://schemas.android.com/tools"/>
+        tools:ignore="ProtectedPermissions" />
 
     <queries>
         <intent>
@@ -23,7 +21,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.StopBreathBeLauncher">
 
-        <!-- Onboarding screen - standard entry point on first launch -->
         <activity
             android:exported="true"
             android:name="com.example.stopbreathbelauncher.ui.screens.OnboardingActivity">
@@ -33,7 +30,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Main launcher activity - handles home button -->
         <activity
             android:exported="true"
             android:launchMode="singleTask"
@@ -45,6 +41,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:exported="false"
+            android:name="com.example.stopbreathbelauncher.ui.screens.SettingsActivity" />
+
     </application>
 
 </manifest>

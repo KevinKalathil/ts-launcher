@@ -2,7 +2,6 @@ package com.example.stopbreathbelauncher.ui.screens
 
 import android.content.Intent
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -10,10 +9,12 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.example.stopbreathbelauncher.ui.components.NudgeDialog
+import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
 import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
+import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
 import com.example.stopbreathbelauncher.ui.viewmodel.LauncherViewModel
 
 class LauncherActivity : ComponentActivity() {
@@ -24,40 +25,42 @@ class LauncherActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (!viewModel.hasUsagePermission()) {
-            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-        }
-
-
         setContent {
             StopBreathBeLauncherTheme {
+                SbbScaffold {
+                    val uiState by viewModel.uiState.collectAsState()
+                    val nudgeApp by viewModel.nudgeApp.collectAsState()
+                    val pagerState = rememberPagerState(pageCount = { 2 })
 
-                val pagerState = rememberPagerState(pageCount = { 2 })
-                val apps by viewModel.allApps.collectAsState()
-                val disabledApps by viewModel.disabledApps.collectAsState()
-                val topTenApps = apps.take(10)
+                    HorizontalPager(
+                        state    = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                    ) { page ->
+                        when (page) {
+                            0 -> HomeScreen(
+                                state          = uiState,
+                                onAppClick     = { app -> handleAppClick(app) },
+                                onSettingsClick = { openSettings() },
+                            )
+                            1 -> AllAppsScreen(
+                                state          = uiState,
+                                onAppClick     = { app -> handleAppClick(app) },
+                                onAppLongClick = { app -> toggleFlag(app) },
+                            )
+                        }
+                    }
 
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize()
-                ) { page ->
-                    // Explicitly handle the content based on page index
-                    when (page) {
-                        0 -> TopTenScreen(
-                            apps = topTenApps,
-                            disabledApps = disabledApps,
-                            onAppClick = { app ->
-                                if (!disabledApps.contains(app.packageName)) {
-                                    launchApp(app.packageName)
-                                } else {
-                                    viewModel.onDisabledAppTapped(app)
-                                }
+                    // Nudge dialog overlay
+                    nudgeApp?.let { app ->
+                        NudgeDialog(
+                            app                   = app,
+                            totalWatchListUsageMs  = uiState.totalWatchListUsageMs,
+                            dailyLimitMs           = uiState.preferences.dailyLimitMinutes * 60 * 1000L,
+                            onOpenAnyway           = {
+                                viewModel.dismissNudge()
+                                launchApp(app.packageName)
                             },
-                        )
-                        1 -> AllAppsScreen(
-                            apps = apps,
-                            disabledApps = disabledApps,
-                            onAppClick = { app -> launchApp(app.packageName) }
+                            onDismiss = { viewModel.dismissNudge() },
                         )
                     }
                 }
@@ -68,11 +71,31 @@ class LauncherActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshApps()
+        viewModel.recordTodayResult()
     }
 
-    @Deprecated("Launchers should stay on the home screen")
-    override fun onBackPressed() {
-        // Do nothing — prevents exiting launcher
+    @Deprecated("Launchers stay on home screen")
+    override fun onBackPressed() { /* no-op */ }
+
+    private fun handleAppClick(app: AppInfo) {
+        viewModel.onAppClicked(app)
+        // If no nudge was set, launch directly
+        if (viewModel.nudgeApp.value == null) {
+            launchApp(app.packageName)
+        }
+    }
+
+    private fun toggleFlag(app: AppInfo) {
+        val prefs = viewModel.uiState.value.preferences
+        when {
+            app.packageName in prefs.watchList -> viewModel.removeFromWatchList(app.packageName)
+            app.packageName in prefs.goalApps  -> viewModel.removeFromGoalApps(app.packageName)
+            else -> viewModel.addToWatchList(app.packageName) // default: add to watch list
+        }
+    }
+
+    private fun openSettings() {
+        startActivity(Intent(this, SettingsActivity::class.java))
     }
 
     private fun launchApp(packageName: String) {
