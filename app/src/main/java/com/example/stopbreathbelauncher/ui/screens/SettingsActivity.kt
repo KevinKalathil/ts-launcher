@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,7 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import com.example.stopbreathbelauncher.data.GoalMode
 import com.example.stopbreathbelauncher.ui.components.AppFlag
 import com.example.stopbreathbelauncher.ui.components.SbbButton
@@ -60,7 +63,18 @@ fun SettingsScreen(
 
     var showDockPicker   by remember { mutableStateOf<Int?>(null) }           // slot index
     var showAppPicker    by remember { mutableStateOf<AppFlag?>(null) }       // which list
-    var limitSlider      by remember { mutableFloatStateOf(prefs.dailyLimitMinutes.toFloat()) }
+
+    var limitSlider by remember(prefs.dailyLimitMinutes) {
+        mutableFloatStateOf(prefs.dailyLimitMinutes.toFloat())
+    }
+    var sliderInitialized by remember { mutableStateOf(false) }
+
+    LaunchedEffect(prefs.dailyLimitMinutes) {
+        if (!sliderInitialized) {
+            limitSlider = prefs.dailyLimitMinutes.toFloat()
+            sliderInitialized = true
+        }
+    }
 
     // Dock picker overlay
     showDockPicker?.let { slotIndex ->
@@ -554,6 +568,10 @@ private fun GoalToggle(selected: GoalMode, onSelect: (GoalMode) -> Unit) {
 
 @Composable
 private fun DockSlotEditor(app: AppInfo?, onClick: () -> Unit) {
+    val bitmap = app?.let {
+        remember(it.packageName) { it.icon.toBitmap(128, 128).asImageBitmap() }
+    }
+
     Column(
         modifier = Modifier.clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -562,20 +580,22 @@ private fun DockSlotEditor(app: AppInfo?, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(52.dp)
-                .border(2.dp, SbbColors.BorderStrong)
                 .background(SbbColors.SurfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                app?.label?.take(3)?.uppercase() ?: "?",
-                style = MaterialTheme.typography.bodyLarge,
-                color = SbbColors.TextSecondary,
-            )
+            if (bitmap != null) {
+                Image(
+                    bitmap             = bitmap,
+                    contentDescription = app?.label,
+                    modifier           = Modifier.size(40.dp),
+                )
+            } else {
+                Text("?", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextDim)
+            }
         }
         Text("EDIT", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
     }
 }
-
 @Composable
 private fun FlowChips(
     packages: Set<String>,

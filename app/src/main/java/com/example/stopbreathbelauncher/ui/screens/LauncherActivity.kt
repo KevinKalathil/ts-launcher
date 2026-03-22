@@ -2,6 +2,7 @@ package com.example.stopbreathbelauncher.ui.screens
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -11,6 +12,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.example.stopbreathbelauncher.ui.components.AppFlag
 import com.example.stopbreathbelauncher.ui.components.NudgeDialog
 import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
 import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
@@ -40,12 +42,17 @@ class LauncherActivity : ComponentActivity() {
                             0 -> HomeScreen(
                                 state          = uiState,
                                 onAppClick     = { app -> handleAppClick(app) },
+                                onAppLongClick = { app -> toggleFlag(app) },
+                                onSetFlag      = { app, flag -> setFlag(app, flag) },
+                                onUninstall    = { app -> uninstallApp(app) },
                                 onSettingsClick = { openSettings() },
                             )
                             1 -> AllAppsScreen(
                                 state          = uiState,
                                 onAppClick     = { app -> handleAppClick(app) },
                                 onAppLongClick = { app -> toggleFlag(app) },
+                                onSetFlag      = { app, flag -> setFlag(app, flag) },
+                                onUninstall    = { app -> uninstallApp(app) },
                             )
                         }
                     }
@@ -88,12 +95,44 @@ class LauncherActivity : ComponentActivity() {
     private fun toggleFlag(app: AppInfo) {
         val prefs = viewModel.uiState.value.preferences
         when {
-            app.packageName in prefs.watchList -> viewModel.removeFromWatchList(app.packageName)
-            app.packageName in prefs.goalApps  -> viewModel.removeFromGoalApps(app.packageName)
-            else -> viewModel.addToWatchList(app.packageName) // default: add to watch list
+            app.packageName in prefs.watchList -> {
+                // WATCH → GOAL
+                viewModel.removeFromWatchList(app.packageName)
+                viewModel.addToGoalApps(app.packageName)
+            }
+            app.packageName in prefs.goalApps -> {
+                // GOAL → NONE
+                viewModel.removeFromGoalApps(app.packageName)
+            }
+            else -> {
+                // NONE → WATCH
+                viewModel.addToWatchList(app.packageName)
+            }
         }
     }
 
+    private fun setFlag(app: AppInfo, flag: AppFlag) {
+        val prefs = viewModel.uiState.value.preferences
+        // Clear from both lists first
+        if (app.packageName in prefs.watchList) viewModel.removeFromWatchList(app.packageName)
+        if (app.packageName in prefs.goalApps)  viewModel.removeFromGoalApps(app.packageName)
+        // Then add to the right one
+        when (flag) {
+            AppFlag.WATCH -> viewModel.addToWatchList(app.packageName)
+            AppFlag.GOAL  -> viewModel.addToGoalApps(app.packageName)
+            AppFlag.NONE  -> { /* already cleared */ }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun uninstallApp(app: AppInfo) {
+        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
+            data = android.net.Uri.parse("package:${app.packageName}")
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Process
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.stopbreathbelauncher.data.*
@@ -40,6 +41,7 @@ data class LauncherUiState(
     ),
     val streakData: StreakData = StreakData(0, "", 0, PlantState.STRESSED),
     val totalWatchListUsageMs: Long = 0L,
+    val totalGoalUsageMs: Long = 0L,
     val nudgeThresholdCrossed: Boolean = false,
 )
 
@@ -63,6 +65,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             .filter { it.packageName in prefs.watchList }
             .sumOf { it.usageTimeMs }
 
+        val goalUsageMs = apps
+            .filter { it.packageName in prefs.goalApps }
+            .sumOf { it.usageTimeMs }
+
         val limitMs = prefs.dailyLimitMinutes * 60 * 1000L
         val nudgeCrossed = watchUsageMs >= limitMs
 
@@ -77,6 +83,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             preferences           = prefs,
             streakData            = streak,
             totalWatchListUsageMs = watchUsageMs,
+            totalGoalUsageMs      = goalUsageMs,
             nudgeThresholdCrossed = nudgeCrossed,
         )
     }.stateIn(
@@ -91,6 +98,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     init {
         refreshApps()
         seedDefaultPinnedAppsIfNeeded()
+        viewModelScope.launch {
+            prefsRepo.userPreferences.collect { prefs ->
+                Log.d("SBB_PREFS", "dailyLimitMinutes = ${prefs.dailyLimitMinutes}")
+            }
+        }
     }
 
     private fun seedDefaultPinnedAppsIfNeeded() {

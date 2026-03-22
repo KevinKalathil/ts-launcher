@@ -30,8 +30,8 @@ object SbbColors {
 
     val TextPrimary     = Color(0xFFCCCCCC)
     val TextSecondary   = Color(0xFF555555)
-    val TextMuted       = Color(0xFF333333)
-    val TextDim         = Color(0xFF222222)
+    val TextMuted       = Color(0xFF555555)
+    val TextDim         = Color(0xFF555555)
 
     val PlantGreen      = Color(0xFF4A7C3F)
     val PlantGreenLight = Color(0xFF5AAD4E)

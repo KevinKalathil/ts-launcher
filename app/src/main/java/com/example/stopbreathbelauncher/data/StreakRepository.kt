@@ -1,6 +1,7 @@
 package com.example.stopbreathbelauncher.data
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -31,6 +32,7 @@ class StreakRepository(private val context: Context) {
         val CURRENT_STREAK        = intPreferencesKey("streak_current")
         val LAST_CHECKED_DATE     = stringPreferencesKey("streak_last_date")
         val CONSECUTIVE_BAD_DAYS  = intPreferencesKey("streak_bad_days")
+        val TODAY_WAS_GOOD        = booleanPreferencesKey("streak_today_was_good")
     }
 
     private val fmt = DateTimeFormatter.ISO_LOCAL_DATE
@@ -54,22 +56,32 @@ class StreakRepository(private val context: Context) {
      * [wasGoodDay] = user stayed within their goal yesterday.
      */
     suspend fun recordDayResult(wasGoodDay: Boolean) {
+        Log.d("kevin", "recorded results ${wasGoodDay}")
         val today = LocalDate.now().format(fmt)
         context.dataStore.edit { prefs ->
             val lastDate = prefs[Keys.LAST_CHECKED_DATE] ?: ""
-            if (lastDate == today) return@edit  // already recorded today
 
-            prefs[Keys.LAST_CHECKED_DATE] = today
+            // New day — reset daily tracking
+            if (lastDate != today) {
+                prefs[Keys.LAST_CHECKED_DATE] = today
+                prefs[Keys.TODAY_WAS_GOOD] = true
+            }
 
-            if (wasGoodDay) {
-                val streak = (prefs[Keys.CURRENT_STREAK] ?: 0) + 1
-                prefs[Keys.CURRENT_STREAK]       = streak
-                prefs[Keys.CONSECUTIVE_BAD_DAYS] = 0
-            } else {
+            // Already recorded as bad today — nothing can change it
+            val alreadyBad = !(prefs[Keys.TODAY_WAS_GOOD] ?: true)
+            if (alreadyBad) return@edit
+
+            // Still good — check if it just turned bad
+            if (!wasGoodDay) {
+                prefs[Keys.TODAY_WAS_GOOD] = false
                 val badDays = (prefs[Keys.CONSECUTIVE_BAD_DAYS] ?: 0) + 1
                 prefs[Keys.CONSECUTIVE_BAD_DAYS] = badDays
-                // Streak only resets on first bad day
                 if (badDays == 1) prefs[Keys.CURRENT_STREAK] = 0
+            } else {
+                // Good day so far — increment streak once per day
+                if (lastDate != today) {
+                    prefs[Keys.CURRENT_STREAK] = (prefs[Keys.CURRENT_STREAK] ?: 0) + 1
+                }
             }
         }
     }

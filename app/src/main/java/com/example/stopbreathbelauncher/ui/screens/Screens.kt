@@ -29,6 +29,9 @@ import androidx.core.graphics.drawable.toBitmap
 fun HomeScreen(
     state: LauncherUiState,
     onAppClick: (AppInfo) -> Unit,
+    onAppLongClick: (AppInfo) -> Unit,
+    onSetFlag: (AppInfo, AppFlag) -> Unit,
+    onUninstall: (AppInfo) -> Unit,
     onSettingsClick: () -> Unit,
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
@@ -47,40 +50,111 @@ fun HomeScreen(
             onSettingsClick = onSettingsClick,
         )
 
-        // List header
+        // List header + total time
+        val limitMs = state.preferences.dailyLimitMinutes * 60 * 1000L
+        val totalProportion = if (limitMs > 0) (state.totalWatchListUsageMs.toFloat() / limitMs).coerceIn(0f, 1f) else 0f
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
-            Text("TOP_10 // USAGE", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextSecondary)
+            Text("Top 10 Apps", style = MaterialTheme.typography.titleLarge, color = SbbColors.TextPrimary)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column {
+                    Text(
+                        text = "${formatUsageTime(state.totalWatchListUsageMs)} / ${"%.2g".format(state.preferences.dailyLimitMinutes / 60f)}H",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = when {
+                            totalProportion >= 0.9f -> SbbColors.WatchRed
+                            totalProportion >= 0.6f -> SbbColors.WatchOrange
+                            else                    -> SbbColors.TextSecondary
+                        },
+                    )
+                    Text(
+                        text  = formatUsageTime(state.totalGoalUsageMs),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = SbbColors.GoalGreenLight,
+                    )
+
+                }
+                Text(
+                    text     = "[⚙]",
+                    style    = MaterialTheme.typography.labelLarge,
+                    color    = SbbColors.TextDim,
+                    modifier = Modifier.clickable { onSettingsClick() },
+                )
+            }
+        }
+
+        // Progress bar toward limit
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(SbbColors.Border)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(totalProportion)
+                    .fillMaxHeight()
+                    .background(when {
+                        totalProportion >= 0.9f -> SbbColors.WatchRed
+                        totalProportion >= 0.6f -> SbbColors.WatchOrange
+                        else                    -> SbbColors.GoalGreen
+                    })
+            )
         }
 
         Divider()
 
         // Wheel scroll list
         Box(modifier = Modifier.weight(1f)) {
-            LineWheelScroll(
-                items          = apps,
-                selectedIndex  = selectedIndex,
-                onItemSelected = { selectedIndex = it },
-            ) { app, isFocused, scale ->
-                val flag = when {
-                    app.packageName in state.preferences.watchList -> AppFlag.WATCH
-                    app.packageName in state.preferences.goalApps  -> AppFlag.GOAL
-                    else -> AppFlag.NONE
+            if (apps.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text  = "LOADING...",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = SbbColors.TextDim,
+                    )
                 }
-                AppRow(
-                    app          = app,
-                    flag         = flag,
-                    isFocused    = isFocused,
-                    scale        = scale,
-                    showBar      = true,
-                    totalUsageMs = totalUsageMs,
-                    onClick      = { onAppClick(app) },
-                )
+            } else {
+                LineWheelScroll(
+                    items          = apps,
+                    selectedIndex  = selectedIndex,
+                    onItemSelected = { selectedIndex = it },
+                ) { app, isFocused, scale ->
+                    val flag = when {
+                        app.packageName in state.preferences.watchList -> AppFlag.WATCH
+                        app.packageName in state.preferences.goalApps  -> AppFlag.GOAL
+                        else -> AppFlag.NONE
+                    }
+                    AppRow(
+                        app          = app,
+                        flag         = flag,
+                        isFocused    = isFocused,
+                        scale        = scale,
+                        showBar      = true,
+                        totalUsageMs = totalUsageMs,
+                        onClick      = { onAppClick(app) },
+                        onFlagChange = { newFlag ->
+                            when (newFlag) {
+                                AppFlag.WATCH -> onSetFlag(app, AppFlag.WATCH)
+                                AppFlag.GOAL  -> onSetFlag(app, AppFlag.GOAL)
+                                AppFlag.NONE  -> onSetFlag(app, AppFlag.NONE)
+                            }
+                        },
+                        onUninstall  = { onUninstall(app) },
+                    )
+                }
             }
         }
 
@@ -146,15 +220,6 @@ private fun PlantHeader(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(contentAlignment = Alignment.TopEnd) {
                 PlantDisplay(state = plantState)
-                Text(
-                    text     = "[⚙]",
-                    style    = MaterialTheme.typography.labelMedium,
-                    color    = SbbColors.TextDim,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .clickable { onSettingsClick() }
-                        .padding(4.dp),
-                )
             }
         }
     }
@@ -169,6 +234,8 @@ fun AllAppsScreen(
     state: LauncherUiState,
     onAppClick: (AppInfo) -> Unit,
     onAppLongClick: (AppInfo) -> Unit,
+    onSetFlag: (AppInfo, AppFlag) -> Unit,
+    onUninstall: (AppInfo) -> Unit,
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
     val apps = state.allApps
@@ -195,6 +262,8 @@ fun AllAppsScreen(
                 items          = apps,
                 selectedIndex  = selectedIndex,
                 onItemSelected = { selectedIndex = it },
+                indexBar       = true,
+                itemLabel      = { it.label },
             ) { app, isFocused, scale ->
                 val flag = when {
                     app.packageName in state.preferences.watchList -> AppFlag.WATCH
@@ -208,7 +277,14 @@ fun AllAppsScreen(
                     scale        = scale,
                     showBar      = true,
                     onClick      = { onAppClick(app) },
-                    onLongClick  = { onAppLongClick(app) },
+                    onFlagChange = { newFlag ->
+                        when (newFlag) {
+                            AppFlag.WATCH -> onSetFlag(app, AppFlag.WATCH)
+                            AppFlag.GOAL  -> onSetFlag(app, AppFlag.GOAL)
+                            AppFlag.NONE  -> onSetFlag(app, AppFlag.NONE)
+                        }
+                    },
+                    onUninstall  = { onUninstall(app) },
                 )
             }
         }

@@ -5,6 +5,8 @@
 
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
 
     <queries>
         <intent>
@@ -23,6 +25,7 @@
 
         <activity
             android:exported="true"
+            android:screenOrientation="portrait"
             android:name="com.example.stopbreathbelauncher.ui.screens.OnboardingActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -32,6 +35,7 @@
 
         <activity
             android:exported="true"
+            android:screenOrientation="portrait"
             android:launchMode="singleTask"
             android:stateNotNeeded="true"
             android:name="com.example.stopbreathbelauncher.ui.screens.LauncherActivity">
@@ -44,6 +48,7 @@
 
         <activity
             android:exported="false"
+            android:screenOrientation="portrait"
             android:name="com.example.stopbreathbelauncher.ui.screens.SettingsActivity" />
 
     </application>
