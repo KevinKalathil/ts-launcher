@@ -1,28 +1,32 @@
 package com.example.stopbreathbelauncher.ui.scroll
 
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import com.example.stopbreathbelauncher.ui.theme.SbbColors
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 private val ALPHABET = ('A'..'Z').toList()
 
@@ -33,103 +37,38 @@ fun <T> LineWheelScroll(
     onItemSelected: (Int) -> Unit,
     thumbColor: androidx.compose.ui.graphics.Color = SbbColors.PlantGreen,
     indexBar: Boolean = false,
-    itemLabel: ((T) -> String)? = null,  // needed for letter lookup
+    itemLabel: ((T) -> String)? = null,
     itemContent: @Composable (item: T, isFocused: Boolean, scale: Float) -> Unit
 ) {
     if (items.isEmpty()) return
 
     val visibleRange = 6
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (selectedIndex - 3).coerceAtLeast(0))
     var focusedIndex by remember { mutableIntStateOf(selectedIndex) }
-    var scrollPosition by remember { mutableFloatStateOf(selectedIndex.toFloat()) }
-    var barHeightPx by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(selectedIndex) {
-        focusedIndex = selectedIndex
-        scrollPosition = selectedIndex.toFloat()
+    // Derive focused index from scroll position
+    LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
+        val newFocused = listState.firstVisibleItemIndex + 3
+        val clamped = newFocused.coerceIn(0, items.lastIndex)
+        if (clamped != focusedIndex) {
+            focusedIndex = clamped
+            onItemSelected(clamped)
+        }
     }
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(top = 16.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        // ── Main scroll area ──────────────────────────────────────────────────
-        Box(
+        LazyColumn(
+            state    = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(items.size) {
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        var totalDragY = 0f
-                        var totalDragX = 0f
-                        var decided = false
-                        var isVertical = false
-
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val drag = event.changes.firstOrNull() ?: break
-                            if (!drag.pressed) break
-
-                            val dy = drag.position.y - drag.previousPosition.y
-                            val dx = drag.position.x - drag.previousPosition.x
-                            totalDragY += dy
-                            totalDragX += dx
-
-                            if (!decided && (totalDragY.absoluteValue > 10f || totalDragX.absoluteValue > 10f)) {
-                                isVertical = totalDragY.absoluteValue > totalDragX.absoluteValue
-                                decided = true
-                            }
-
-                            if (decided && isVertical) {
-                                drag.consume()
-                                val sensitivity = 400f
-                                val delta = -dy / sensitivity
-                                scrollPosition = (scrollPosition + delta).coerceIn(0f, (items.size - 1).toFloat())
-                                val newIndex = scrollPosition.roundToInt().coerceIn(0, items.lastIndex)
-                                if (newIndex != focusedIndex) {
-                                    focusedIndex = newIndex
-                                    onItemSelected(newIndex)
-                                }
-                            }
-                        }
-                    }
-                },
-            contentAlignment = Alignment.CenterStart,
+                .padding(start = 24.dp, end = if (indexBar) 56.dp else 16.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 16.dp, end = if (indexBar) 28.dp else 16.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                val start = (focusedIndex - visibleRange).coerceAtLeast(0)
-                val end   = (focusedIndex + visibleRange).coerceAtMost(items.lastIndex)
-
-                for (i in start..end) {
-                    val distance = (i - scrollPosition).absoluteValue
-
-                    val targetAlpha = (1f - (distance / (visibleRange + 1))).coerceIn(0.5f, 1f)
-                    val targetScale = (1f + ((1f - distance) * 0.15f)).coerceIn(0.85f, 1.15f)
-
-                    val alpha by animateFloatAsState(
-                        targetValue   = targetAlpha,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness    = Spring.StiffnessHigh,
-                        ),
-                        label = "alpha_$i",
-                    )
-                    val scale by animateFloatAsState(
-                        targetValue   = targetScale,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness    = Spring.StiffnessHigh,
-                        ),
-                        label = "scale_$i",
-                    )
-
-                    Box(Modifier.alpha(alpha)) {
-                        itemContent(items[i], i == focusedIndex, scale)
-                    }
+            itemsIndexed(items) { i, item ->
+                androidx.compose.foundation.layout.Box(Modifier.alpha(1f)) {
+                    itemContent(item, i == focusedIndex, 1f)
                 }
             }
         }
@@ -138,6 +77,7 @@ fun <T> LineWheelScroll(
         if (indexBar && itemLabel != null) {
             var columnHeightPx by remember { mutableIntStateOf(0) }
             var columnOffsetYPx by remember { mutableIntStateOf(0) }
+            val scope = rememberCoroutineScope()
 
             Box(
                 modifier = Modifier
@@ -157,8 +97,10 @@ fun <T> LineWheelScroll(
                                     itemLabel(it).uppercase().firstOrNull() ?: ' ' >= letter
                                 }.takeIf { it >= 0 } ?: items.lastIndex
                                 focusedIndex = target
-                                scrollPosition = target.toFloat()
                                 onItemSelected(target)
+                                scope.launch {
+                                    listState.scrollToItem((target - 3).coerceAtLeast(0))
+                                }
                             }
 
                             val down = currentEvent.changes.firstOrNull() ?: return@awaitEachGesture
@@ -179,7 +121,8 @@ fun <T> LineWheelScroll(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.onSizeChanged { columnHeightPx = it.height }
+                    modifier = Modifier
+                        .onSizeChanged { columnHeightPx = it.height }
                         .onGloballyPositioned { columnOffsetYPx = it.positionInParent().y.toInt() },
                 ) {
                     ALPHABET.forEach { letter ->

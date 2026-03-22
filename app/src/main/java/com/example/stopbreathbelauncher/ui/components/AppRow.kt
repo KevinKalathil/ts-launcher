@@ -45,7 +45,7 @@ fun AppRow(
 ) {
     var showPopup by remember { mutableStateOf(false) }
 
-    val alpha = if (isFocused) 1f else if (alpha(isFocused) > 0.4f) 0.55f else 0.25f
+    val alpha = 1f
 
     val bitmap = remember(app.packageName) {
         app.icon.toBitmap(96, 96).asImageBitmap()
