@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,12 +25,14 @@ import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.lazy.LazyListPrefetchStrategy
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 
 private val ALPHABET = ('A'..'Z').toList()
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> LineWheelScroll(
     items: List<T>,
@@ -42,8 +45,11 @@ fun <T> LineWheelScroll(
 ) {
     if (items.isEmpty()) return
 
-    val visibleRange = 6
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (selectedIndex - 3).coerceAtLeast(0))
+    val prefetchStrategy = remember { LazyListPrefetchStrategy(nestedPrefetchItemCount = 40) }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = (selectedIndex - 3).coerceAtLeast(0),
+        prefetchStrategy = prefetchStrategy,
+    )
     var focusedIndex by remember { mutableIntStateOf(selectedIndex) }
 
     // Derive focused index from scroll position

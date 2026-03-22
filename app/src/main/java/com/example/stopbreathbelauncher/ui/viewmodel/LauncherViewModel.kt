@@ -196,9 +196,34 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private fun getTodayUsageStats(): Map<String, Long> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        return usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, todayStartMs(), System.currentTimeMillis())
-            ?.associate { it.packageName to it.totalTimeInForeground }
-            ?: emptyMap()
+        val startMs = todayStartMs()
+        val endMs = System.currentTimeMillis()
+        val usageMap = mutableMapOf<String, Long>()
+        val resumeMap = mutableMapOf<String, Long>()
+
+        val events = usm.queryEvents(startMs, endMs)
+        val event = android.app.usage.UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            when (event.eventType) {
+                android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    resumeMap[event.packageName] = event.timeStamp
+                }
+                android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
+                    val resumeTime = resumeMap.remove(event.packageName)
+                    if (resumeTime != null) {
+                        usageMap[event.packageName] = (usageMap[event.packageName] ?: 0L) + (event.timeStamp - resumeTime)
+                    }
+                }
+            }
+        }
+
+        // Close any still-open sessions
+        resumeMap.forEach { (pkg, resumeTime) ->
+            usageMap[pkg] = (usageMap[pkg] ?: 0L) + (endMs - resumeTime)
+        }
+
+        return usageMap
     }
 
     private fun getTodayOpenCounts(): Map<String, Int> {
