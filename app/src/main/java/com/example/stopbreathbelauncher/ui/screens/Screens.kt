@@ -59,30 +59,22 @@ fun HomeScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Top 10 Apps", style = MaterialTheme.typography.titleLarge, color = SbbColors.TextPrimary)
+            Text("MOST_USED_APPS", style = MaterialTheme.typography.headlineMedium, color = SbbColors.TextPrimary)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                Column {
-                    Text(
-                        text = "${formatUsageTime(state.totalWatchListUsageMs)} / ${"%.2g".format(state.preferences.dailyLimitMinutes / 60f)}H",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = when {
-                            totalProportion >= 0.9f -> SbbColors.WatchRed
-                            totalProportion >= 0.6f -> SbbColors.WatchOrange
-                            else                    -> SbbColors.TextSecondary
-                        },
-                    )
-                    Text(
-                        text  = formatUsageTime(state.totalGoalUsageMs),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = SbbColors.GoalGreenLight,
-                    )
-
-                }
+                Text(
+                    text = "${formatUsageTime(state.totalWatchListUsageMs)} / ${"%.2g".format(state.preferences.dailyLimitMinutes / 60f)}H",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = when {
+                        totalProportion >= 0.9f -> SbbColors.WatchRed
+                        totalProportion >= 0.6f -> SbbColors.WatchOrange
+                        else                    -> SbbColors.TextSecondary
+                    },
+                )
                 Text(
                     text     = "[⚙]",
                     style    = MaterialTheme.typography.labelLarge,
@@ -90,25 +82,6 @@ fun HomeScreen(
                     modifier = Modifier.clickable { onSettingsClick() },
                 )
             }
-        }
-
-        // Progress bar toward limit
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .background(SbbColors.Border)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(totalProportion)
-                    .fillMaxHeight()
-                    .background(when {
-                        totalProportion >= 0.9f -> SbbColors.WatchRed
-                        totalProportion >= 0.6f -> SbbColors.WatchOrange
-                        else                    -> SbbColors.GoalGreen
-                    })
-            )
         }
 
         Divider()
@@ -134,7 +107,6 @@ fun HomeScreen(
                 ) { app, isFocused, scale ->
                     val flag = when {
                         app.packageName in state.preferences.watchList -> AppFlag.WATCH
-                        app.packageName in state.preferences.goalApps  -> AppFlag.GOAL
                         else -> AppFlag.NONE
                     }
                     AppRow(
@@ -148,7 +120,6 @@ fun HomeScreen(
                         onFlagChange = { newFlag ->
                             when (newFlag) {
                                 AppFlag.WATCH -> onSetFlag(app, AppFlag.WATCH)
-                                AppFlag.GOAL  -> onSetFlag(app, AppFlag.GOAL)
                                 AppFlag.NONE  -> onSetFlag(app, AppFlag.NONE)
                             }
                         },
@@ -209,11 +180,22 @@ private fun PlantHeader(
                 color = SbbColors.TextSecondary,  // was TextDim
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                text  = "STREAK: ${if (streakCount > 0) "$streakCount DAYS" else "—"}  $streakPips",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (streakCount > 0) SbbColors.PlantGreen else SbbColors.TextSecondary,  // was TextDim
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text  = "STREAK: ${if (streakCount > 0) "$streakCount DAYS" else "—"}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (streakCount > 0) SbbColors.PlantGreen else SbbColors.TextSecondary,
+                )
+                Text(
+                    text  = streakPips,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (streakCount > 0) SbbColors.PlantGreen else SbbColors.TextSecondary,
+                    modifier = Modifier.offset(y = (-3).dp),
+                )
+            }
         }
 
         // Plant + settings gear
@@ -267,7 +249,6 @@ fun AllAppsScreen(
             ) { app, isFocused, scale ->
                 val flag = when {
                     app.packageName in state.preferences.watchList -> AppFlag.WATCH
-                    app.packageName in state.preferences.goalApps  -> AppFlag.GOAL
                     else -> AppFlag.NONE
                 }
                 AppRow(
@@ -280,7 +261,6 @@ fun AllAppsScreen(
                     onFlagChange = { newFlag ->
                         when (newFlag) {
                             AppFlag.WATCH -> onSetFlag(app, AppFlag.WATCH)
-                            AppFlag.GOAL  -> onSetFlag(app, AppFlag.GOAL)
                             AppFlag.NONE  -> onSetFlag(app, AppFlag.NONE)
                         }
                     },
@@ -317,25 +297,11 @@ fun Dock(
 
 @Composable
 private fun DockSlot(app: AppInfo, onClick: () -> Unit) {
-    val bitmap = remember(app.packageName) {
-        app.icon.toBitmap(128, 128).asImageBitmap()
-    }
-
-    Box(
-        modifier = Modifier
-            .size(52.dp)
-            .background(SbbColors.SurfaceVariant)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        androidx.compose.foundation.Image(
-            bitmap             = bitmap,
-            contentDescription = app.label,
-            modifier           = Modifier.size(52.dp),
-        )
-    }
-
-
+    AppIconSlot(
+        app     = app,
+        size    = 52.dp,
+        onClick = onClick,
+    )
 }
 
 @Composable

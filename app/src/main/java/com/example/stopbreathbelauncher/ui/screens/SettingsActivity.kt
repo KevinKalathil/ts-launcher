@@ -21,9 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import com.example.stopbreathbelauncher.data.GoalMode
 import com.example.stopbreathbelauncher.ui.components.AppFlag
-import com.example.stopbreathbelauncher.ui.components.SbbButton
+import com.example.stopbreathbelauncher.ui.components.AppIconSlot
 import com.example.stopbreathbelauncher.ui.theme.SbbColors
 import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
 import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
@@ -97,12 +96,10 @@ fun SettingsScreen(
         AddAppPickerScreen(
             apps       = uiState.allApps,
             watchList  = prefs.watchList,
-            goalApps   = prefs.goalApps,
             targetFlag = targetFlag,
             onAdd      = { app ->
                 when (targetFlag) {
                     AppFlag.WATCH -> viewModel.addToWatchList(app.packageName)
-                    AppFlag.GOAL  -> viewModel.addToGoalApps(app.packageName)
                     AppFlag.NONE  -> {}
                 }
                 showAppPicker = null
@@ -132,29 +129,6 @@ fun SettingsScreen(
         }
 
         Divider()
-
-        // ── Goal Mode ──────────────────────────────────────────────────────
-
-        SectionLabel("GOAL MODE")
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Mode", style = MaterialTheme.typography.titleLarge, color = SbbColors.TextPrimary)
-                Text("Reduce total use, or redirect to better apps?",
-                    style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
-            }
-            Spacer(Modifier.width(12.dp))
-            GoalToggle(
-                selected = prefs.goalMode,
-                onSelect = { viewModel.setGoalMode(it) },
-            )
-        }
 
         // Limit scrubber
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -219,26 +193,11 @@ fun SettingsScreen(
         FlowChips(
             packages  = prefs.watchList,
             allApps   = uiState.allApps,
-            chipColor = SbbColors.WatchRedLight,
+            chipColor = SbbColors.WatchRed,
             chipBg    = SbbColors.WatchRedBg,
             chipBorder = SbbColors.WatchRedBorder,
             onRemove  = { viewModel.removeFromWatchList(it) },
             onAdd     = { showAppPicker = AppFlag.WATCH },
-        )
-
-        SectionDivider()
-
-        // ── Goal Apps (always visible, contextual label) ────────────────────
-
-        SectionLabel("GOAL APPS")
-        FlowChips(
-            packages   = prefs.goalApps,
-            allApps    = uiState.allApps,
-            chipColor  = SbbColors.GoalGreenLight,
-            chipBg     = SbbColors.GoalGreenBg,
-            chipBorder = SbbColors.GoalGreenBorder,
-            onRemove   = { viewModel.removeFromGoalApps(it) },
-            onAdd      = { showAppPicker = AppFlag.GOAL },
         )
 
         SectionDivider()
@@ -263,7 +222,7 @@ fun SettingsScreen(
             title = "Reset streak",
             sub   = "Start over from day 1",
             right = {
-                Text("[RESET]", style = MaterialTheme.typography.bodyLarge, color = SbbColors.WatchRedLight,
+                Text("[RESET]", style = MaterialTheme.typography.bodyLarge, color = SbbColors.WatchRed,
                     modifier = Modifier.clickable { viewModel.resetStreak() })
             }
         )
@@ -310,21 +269,6 @@ fun AppPickerScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(title, style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                currentSlots.forEachIndexed { i, pkg ->
-                    val isActive = i == activeSlot
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(if (isActive) SbbColors.GoalGreenBg else SbbColors.SurfaceVariant)
-                            .border(2.dp, if (isActive) SbbColors.PlantGreen else SbbColors.Border),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val label = apps.find { it.packageName == pkg }?.label?.take(3) ?: "?"
-                        Text(label, style = MaterialTheme.typography.labelSmall, color = if (isActive) SbbColors.PlantGreen else SbbColors.TextMuted)
-                    }
-                }
-            }
         }
 
         Divider()
@@ -341,7 +285,6 @@ fun AppPickerScreen(
                     isFocused = isFocused,
                     scale     = scale,
                     onClick   = { onPick(app) },
-                    hint      = if (isFocused) "TAP TO SET IN SLOT ${activeSlot + 1}" else null,
                 )
             }
         }
@@ -389,7 +332,6 @@ fun AppPickerScreen(
 fun AddAppPickerScreen(
     apps: List<AppInfo>,
     watchList: Set<String>,
-    goalApps: Set<String>,
     targetFlag: AppFlag,
     onAdd: (AppInfo) -> Unit,
     onBack: () -> Unit,
@@ -423,16 +365,14 @@ fun AddAppPickerScreen(
         ) {
             Text("ADDING TO", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
             Row(modifier = Modifier.border(1.dp, SbbColors.BorderStrong)) {
-                listOf(AppFlag.WATCH to "WATCH LIST", AppFlag.GOAL to "GOAL APPS").forEach { (flag, label) ->
+                listOf(AppFlag.WATCH to "WATCH LIST").forEach { (flag, label) ->
                     val selected = currentTarget == flag
                     val bgColor = when {
                         selected && flag == AppFlag.WATCH -> SbbColors.WatchRedBg
-                        selected && flag == AppFlag.GOAL  -> SbbColors.GoalGreenBg
                         else -> SbbColors.Surface
                     }
                     val textColor = when {
-                        selected && flag == AppFlag.WATCH -> SbbColors.WatchRedLight
-                        selected && flag == AppFlag.GOAL  -> SbbColors.GoalGreenLight
+                        selected && flag == AppFlag.WATCH -> SbbColors.WatchRed
                         else -> SbbColors.TextMuted
                     }
                     Text(
@@ -459,7 +399,6 @@ fun AddAppPickerScreen(
             ) { app, isFocused, scale ->
                 val existingFlag = when {
                     app.packageName in watchList -> AppFlag.WATCH
-                    app.packageName in goalApps  -> AppFlag.GOAL
                     else -> AppFlag.NONE
                 }
                 val alreadyAdded = existingFlag == currentTarget
@@ -469,20 +408,15 @@ fun AddAppPickerScreen(
                     isFocused = isFocused,
                     scale     = scale,
                     onClick   = { if (!alreadyAdded) onAdd(app) },
-                    hint      = when {
-                        isFocused && alreadyAdded  -> "ALREADY ON ${if (currentTarget == AppFlag.WATCH) "WATCH LIST" else "GOAL APPS"}"
-                        isFocused && !alreadyAdded -> "TAP TO ADD"
-                        else -> null
-                    },
                 )
             }
         }
 
         // Current list summary
         Divider()
-        val currentList = if (currentTarget == AppFlag.WATCH) watchList else goalApps
+        val currentList = if (currentTarget == AppFlag.WATCH) watchList else emptyList()
         val label = if (currentTarget == AppFlag.WATCH) "CURRENT WATCH LIST" else "CURRENT GOAL APPS"
-        val chipColor = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRedLight else SbbColors.GoalGreenLight
+        val chipColor = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRed else SbbColors.GoalGreenLight
         val chipBg = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRedBg else SbbColors.GoalGreenBg
         val chipBorder = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRedBorder else SbbColors.GoalGreenBorder
 
@@ -549,52 +483,11 @@ private fun SettingRow(
 }
 
 @Composable
-private fun GoalToggle(selected: GoalMode, onSelect: (GoalMode) -> Unit) {
-    Row(modifier = Modifier.border(1.dp, SbbColors.BorderStrong)) {
-        listOf(GoalMode.REDUCE to "REDUCE", GoalMode.REDIRECT to "REDIRECT").forEach { (mode, label) ->
-            val isSelected = selected == mode
-            Text(
-                text     = label,
-                style    = MaterialTheme.typography.labelLarge,
-                color    = if (isSelected) SbbColors.PlantGreen else SbbColors.TextMuted,
-                modifier = Modifier
-                    .background(if (isSelected) SbbColors.GoalGreenBg else SbbColors.Surface)
-                    .clickable { onSelect(mode) }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            )
-        }
-    }
-}
-
-@Composable
 private fun DockSlotEditor(app: AppInfo?, onClick: () -> Unit) {
-    val bitmap = app?.let {
-        remember(it.packageName) { it.icon.toBitmap(128, 128).asImageBitmap() }
-    }
-
-    Column(
-        modifier = Modifier.clickable { onClick() },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .background(SbbColors.SurfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (bitmap != null) {
-                Image(
-                    bitmap             = bitmap,
-                    contentDescription = app?.label,
-                    modifier           = Modifier.size(40.dp),
-                )
-            } else {
-                Text("?", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextDim)
-            }
-        }
-        Text("EDIT", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
-    }
+    AppIconSlot(
+        app         = app,
+        onClick     = onClick,
+    )
 }
 @Composable
 private fun FlowChips(
@@ -609,35 +502,30 @@ private fun FlowChips(
     // Simple row wrap using a column of rows
     val items = packages.toList()
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).padding(bottom = 12.dp)) {
+        Box(
+            modifier = Modifier
+                .background(SbbColors.Surface)
+                .border(1.dp, SbbColors.Border)
+                .clickable { onAdd() }
+                .padding(start = 6.dp, end = 6.dp, top = 0.dp, bottom = 12.dp),
+        ) {
+            Text("+ ADD APP", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextMuted)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             items.forEach { pkg ->
-                val label = allApps.find { it.packageName == pkg }?.label?.take(10) ?: pkg.take(10)
-                Row(
-                    modifier = Modifier
-                        .background(chipBg)
-                        .border(1.dp, chipBorder)
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = chipColor)
-                    Text(
-                        "[×]",
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = chipColor.copy(alpha = 0.6f),
-                        modifier = Modifier.clickable { onRemove(pkg) },
-                    )
-                }
+                val app = allApps.find { it.packageName == pkg }
+                AppIconSlot(
+                    app         = app,
+                    badge       = {
+                        Text(
+                            "[×]",
+                            style    = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.clickable { onRemove(pkg) },
+                        )
+                    },
+                )
             }
-            Box(
-                modifier = Modifier
-                    .background(SbbColors.Surface)
-                    .border(1.dp, SbbColors.Border)
-                    .clickable { onAdd() }
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
-            ) {
-                Text("+ ADD APP", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextMuted)
-            }
+
         }
     }
 }

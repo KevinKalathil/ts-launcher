@@ -93,7 +93,7 @@ fun NudgeDialog(
                     Text(
                         text  = "WATCH LIST",
                         style = MaterialTheme.typography.labelSmall,
-                        color = SbbColors.WatchRedLight,
+                        color = SbbColors.WatchRed,
                     )
                 }
             }
@@ -121,7 +121,7 @@ fun NudgeDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text("DAILY LIMIT", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
-                    Text("$limitPct% USED", style = MaterialTheme.typography.labelLarge, color = SbbColors.WatchRedLight)
+                    Text("$limitPct% USED", style = MaterialTheme.typography.labelLarge, color = SbbColors.WatchRed)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Box(
@@ -199,7 +199,7 @@ private fun StatBox(
         Text(
             text  = value,
             style = MaterialTheme.typography.headlineMedium,
-            color = if (warn) SbbColors.WatchRedLight else SbbColors.TextPrimary,
+            color = if (warn) SbbColors.WatchRed else SbbColors.TextPrimary,
         )
     }
 }

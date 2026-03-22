@@ -38,8 +38,7 @@ object SbbColors {
     val PlantGreenDark  = Color(0xFF1E3A1A)
     val PlantBrown      = Color(0xFF7C5C3F)
 
-    val WatchRed        = Color(0xFF6B2020)
-    val WatchRedLight   = Color(0xFF8B3A3A)
+    val WatchRed        = Color(0xFFBB4040)
     val WatchRedBg      = Color(0xFF1A0A0A)
     val WatchRedBorder  = Color(0xFF4A1A1A)
 
@@ -71,7 +70,7 @@ val SbbColorScheme = darkColorScheme(
     onSurfaceVariant = SbbColors.TextSecondary,
     primary          = SbbColors.PlantGreen,
     onPrimary        = SbbColors.Background,
-    error            = SbbColors.WatchRedLight,
+    error            = SbbColors.WatchRed,
     onError          = SbbColors.Background,
     outline          = SbbColors.Border,
     outlineVariant   = SbbColors.BorderStrong,

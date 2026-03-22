@@ -78,7 +78,6 @@ class LauncherActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshApps()
-        viewModel.recordTodayResult()
     }
 
     @Deprecated("Launchers stay on home screen")
@@ -96,13 +95,8 @@ class LauncherActivity : ComponentActivity() {
         val prefs = viewModel.uiState.value.preferences
         when {
             app.packageName in prefs.watchList -> {
-                // WATCH → GOAL
+                // WATCH → None
                 viewModel.removeFromWatchList(app.packageName)
-                viewModel.addToGoalApps(app.packageName)
-            }
-            app.packageName in prefs.goalApps -> {
-                // GOAL → NONE
-                viewModel.removeFromGoalApps(app.packageName)
             }
             else -> {
                 // NONE → WATCH
@@ -115,11 +109,9 @@ class LauncherActivity : ComponentActivity() {
         val prefs = viewModel.uiState.value.preferences
         // Clear from both lists first
         if (app.packageName in prefs.watchList) viewModel.removeFromWatchList(app.packageName)
-        if (app.packageName in prefs.goalApps)  viewModel.removeFromGoalApps(app.packageName)
         // Then add to the right one
         when (flag) {
             AppFlag.WATCH -> viewModel.addToWatchList(app.packageName)
-            AppFlag.GOAL  -> viewModel.addToGoalApps(app.packageName)
             AppFlag.NONE  -> { /* already cleared */ }
         }
     }

@@ -1,11 +1,13 @@
 package com.example.stopbreathbelauncher.data
 
 import android.content.Context
-import android.util.Log
 import androidx.datastore.preferences.core.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -19,87 +21,127 @@ enum class PlantState {
     DEAD        // 3+ bad days
 }
 
+@Serializable
+data class DayRecord(
+    val date: String,
+    val watchUsageMs: Long,
+    val limitMs: Long,
+    val wasGood: Boolean,       // locked in at end of day, dynamic today
+)
+
 data class StreakData(
     val currentStreak: Int,
-    val lastCheckedDate: String,  // ISO date string
+    val lastCheckedDate: String,
     val consecutiveBadDays: Int,
     val plantState: PlantState,
+    val history: List<DayRecord>,
 )
 
 class StreakRepository(private val context: Context) {
 
     private object Keys {
-        val CURRENT_STREAK        = intPreferencesKey("streak_current")
-        val LAST_CHECKED_DATE     = stringPreferencesKey("streak_last_date")
-        val CONSECUTIVE_BAD_DAYS  = intPreferencesKey("streak_bad_days")
-        val TODAY_WAS_GOOD        = booleanPreferencesKey("streak_today_was_good")
+        val DAY_HISTORY = stringPreferencesKey("streak_day_history")  // JSON array
     }
 
     private val fmt = DateTimeFormatter.ISO_LOCAL_DATE
+    private val json = Json { ignoreUnknownKeys = true }
 
     val streakData: Flow<StreakData> = context.dataStore.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
         .map { prefs ->
-            val streak     = prefs[Keys.CURRENT_STREAK] ?: 0
-            val badDays    = prefs[Keys.CONSECUTIVE_BAD_DAYS] ?: 0
-            val lastDate   = prefs[Keys.LAST_CHECKED_DATE] ?: ""
-            StreakData(
-                currentStreak       = streak,
-                lastCheckedDate     = lastDate,
-                consecutiveBadDays  = badDays,
-                plantState          = resolvePlantState(streak, badDays),
-            )
+            val history = parseHistory(prefs[Keys.DAY_HISTORY])
+            buildStreakData(history)
         }
 
-    /**
-     * Call once per day (on resume) to evaluate whether yesterday was a good or bad day.
-     * [wasGoodDay] = user stayed within their goal yesterday.
-     */
-    suspend fun recordDayResult(wasGoodDay: Boolean) {
-        Log.d("kevin", "recorded results ${wasGoodDay}")
+    suspend fun recordDayResult(watchUsageMs: Long, limitMs: Long) {
         val today = LocalDate.now().format(fmt)
         context.dataStore.edit { prefs ->
-            val lastDate = prefs[Keys.LAST_CHECKED_DATE] ?: ""
+            val history = parseHistory(prefs[Keys.DAY_HISTORY]).toMutableList()
 
-            // New day — reset daily tracking
-            if (lastDate != today) {
-                prefs[Keys.LAST_CHECKED_DATE] = today
-                prefs[Keys.TODAY_WAS_GOOD] = true
-            }
+            val todayIndex = history.indexOfFirst { it.date == today }
+            val wasGood = watchUsageMs < limitMs
 
-            // Already recorded as bad today — nothing can change it
-            val alreadyBad = !(prefs[Keys.TODAY_WAS_GOOD] ?: true)
-            if (alreadyBad) return@edit
-
-            // Still good — check if it just turned bad
-            if (!wasGoodDay) {
-                prefs[Keys.TODAY_WAS_GOOD] = false
-                val badDays = (prefs[Keys.CONSECUTIVE_BAD_DAYS] ?: 0) + 1
-                prefs[Keys.CONSECUTIVE_BAD_DAYS] = badDays
-                if (badDays == 1) prefs[Keys.CURRENT_STREAK] = 0
+            if (todayIndex >= 0) {
+                // Update today's record dynamically
+                history[todayIndex] = history[todayIndex].copy(
+                    watchUsageMs = watchUsageMs,
+                    limitMs      = limitMs,
+                    wasGood      = wasGood,
+                )
             } else {
-                // Good day so far — increment streak once per day
-                if (lastDate != today) {
-                    prefs[Keys.CURRENT_STREAK] = (prefs[Keys.CURRENT_STREAK] ?: 0) + 1
-                }
+                // New day — add record and trim to 7 days
+                history.add(DayRecord(
+                    date         = today,
+                    watchUsageMs = watchUsageMs,
+                    limitMs      = limitMs,
+                    wasGood      = wasGood,
+                ))
+                history.sortBy { it.date }
+                while (history.size > 7) history.removeAt(0)
             }
+
+            prefs[Keys.DAY_HISTORY] = json.encodeToString(history)
         }
     }
 
     suspend fun resetStreak() {
         context.dataStore.edit { prefs ->
-            prefs[Keys.CURRENT_STREAK]       = 0
-            prefs[Keys.CONSECUTIVE_BAD_DAYS] = 0
-            prefs[Keys.LAST_CHECKED_DATE]    = ""
+            prefs[Keys.DAY_HISTORY] = "[]"
         }
     }
 
-    private fun resolvePlantState(streak: Int, badDays: Int): PlantState = when {
-        badDays >= 3  -> PlantState.DEAD
-        badDays == 2  -> PlantState.DYING
-        badDays == 1  -> PlantState.WILTING
-        streak >= 7   -> PlantState.THRIVING
-        streak >= 3   -> PlantState.HEALTHY
-        else          -> PlantState.STRESSED
+    private fun parseHistory(raw: String?): List<DayRecord> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return try {
+            json.decodeFromString<List<DayRecord>>(raw)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun buildStreakData(history: List<DayRecord>): StreakData {
+        val today = LocalDate.now().format(fmt)
+        val sorted = history.sortedBy { it.date }
+
+        // Compute streak — count consecutive good days ending today or yesterday
+        var streak = 0
+        var badDays = 0
+        for (record in sorted.reversed()) {
+            if (record.wasGood) {
+                streak++
+                badDays = 0
+            } else {
+                badDays++
+                if (badDays >= 1) break
+            }
+        }
+
+        // Consecutive bad days from end of history
+        var consecutiveBad = 0
+        for (record in sorted.reversed()) {
+            if (!record.wasGood) consecutiveBad++
+            else break
+        }
+
+        val todayRecord = sorted.find { it.date == today }
+        val plantState = resolvePlantState(streak, consecutiveBad, todayRecord)
+
+        return StreakData(
+            currentStreak      = streak,
+            lastCheckedDate    = sorted.lastOrNull()?.date ?: "",
+            consecutiveBadDays = consecutiveBad,
+            plantState         = plantState,
+            history            = sorted,
+        )
+    }
+
+    private fun resolvePlantState(streak: Int, badDays: Int, today: DayRecord?): PlantState = when {
+        badDays >= 3                                          -> PlantState.DEAD
+        badDays == 2                                          -> PlantState.DYING
+        badDays == 1                                          -> PlantState.WILTING
+        today != null && today.watchUsageMs >= today.limitMs  -> PlantState.WILTING
+        streak >= 7                                           -> PlantState.THRIVING
+        streak >= 3                                           -> PlantState.HEALTHY
+        else                                                  -> PlantState.STRESSED
     }
 }

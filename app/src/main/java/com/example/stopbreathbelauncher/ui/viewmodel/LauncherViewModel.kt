@@ -32,16 +32,19 @@ data class LauncherUiState(
     val topTenApps: List<AppInfo> = emptyList(),
     val pinnedApps: List<AppInfo?> = List(4) { null },
     val preferences: UserPreferences = UserPreferences(
-        goalMode = GoalMode.REDUCE,
         dailyLimitMinutes = 120,
         watchList = emptySet(),
-        goalApps = emptySet(),
         pinnedApps = emptyList(),
         onboardingComplete = false,
     ),
-    val streakData: StreakData = StreakData(0, "", 0, PlantState.STRESSED),
+    val streakData: StreakData = StreakData(
+        currentStreak      = 0,
+        lastCheckedDate    = "",
+        consecutiveBadDays = 0,
+        plantState         = PlantState.STRESSED,
+        history            = emptyList(),
+    ),
     val totalWatchListUsageMs: Long = 0L,
-    val totalGoalUsageMs: Long = 0L,
     val nudgeThresholdCrossed: Boolean = false,
 )
 
@@ -65,10 +68,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             .filter { it.packageName in prefs.watchList }
             .sumOf { it.usageTimeMs }
 
-        val goalUsageMs = apps
-            .filter { it.packageName in prefs.goalApps }
-            .sumOf { it.usageTimeMs }
-
         val limitMs = prefs.dailyLimitMinutes * 60 * 1000L
         val nudgeCrossed = watchUsageMs >= limitMs
 
@@ -83,7 +82,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             preferences           = prefs,
             streakData            = streak,
             totalWatchListUsageMs = watchUsageMs,
-            totalGoalUsageMs      = goalUsageMs,
             nudgeThresholdCrossed = nudgeCrossed,
         )
     }.stateIn(
@@ -103,6 +101,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 Log.d("SBB_PREFS", "dailyLimitMinutes = ${prefs.dailyLimitMinutes}")
             }
         }
+
+        viewModelScope.launch {
+            uiState
+                .filter { it.allApps.isNotEmpty() }
+                .collect { state ->
+                    val limitMs = state.preferences.dailyLimitMinutes * 60 * 1000L
+                    streakRepo.recordDayResult(
+                        watchUsageMs = state.totalWatchListUsageMs,
+                        limitMs      = limitMs,
+                    )
+                }
+        }
+
     }
 
     private fun seedDefaultPinnedAppsIfNeeded() {
@@ -147,19 +158,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun dismissNudge() { _nudgeApp.value = null }
 
-    fun recordTodayResult() {
-        viewModelScope.launch {
-            val wasGoodDay = !uiState.value.nudgeThresholdCrossed
-            streakRepo.recordDayResult(wasGoodDay)
-        }
-    }
-
     fun resetStreak() {
         viewModelScope.launch { streakRepo.resetStreak() }
-    }
-
-    fun setGoalMode(mode: GoalMode) {
-        viewModelScope.launch { prefsRepo.setGoalMode(mode) }
     }
 
     fun setDailyLimitMinutes(minutes: Int) {
@@ -172,14 +172,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun removeFromWatchList(packageName: String) {
         viewModelScope.launch { prefsRepo.removeFromWatchList(packageName) }
-    }
-
-    fun addToGoalApps(packageName: String) {
-        viewModelScope.launch { prefsRepo.addToGoalApps(packageName) }
-    }
-
-    fun removeFromGoalApps(packageName: String) {
-        viewModelScope.launch { prefsRepo.removeFromGoalApps(packageName) }
     }
 
     fun setPinnedApps(packages: List<String>) {

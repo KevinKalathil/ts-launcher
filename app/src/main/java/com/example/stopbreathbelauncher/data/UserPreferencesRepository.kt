@@ -12,13 +12,9 @@ import java.io.IOException
 // Top-level DataStore instance — one per app
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
-enum class GoalMode { REDUCE, REDIRECT }
-
 data class UserPreferences(
-    val goalMode: GoalMode,
     val dailyLimitMinutes: Int,       // Reduce: cap in minutes. Redirect: target ratio numerator (goal mins per watch min)
     val watchList: Set<String>,       // Package names
-    val goalApps: Set<String>,        // Package names
     val pinnedApps: List<String>,     // Package names, ordered — exactly 4
     val onboardingComplete: Boolean,
 )
@@ -26,10 +22,8 @@ data class UserPreferences(
 class UserPreferencesRepository(private val context: Context) {
 
     private object Keys {
-        val GOAL_MODE             = stringPreferencesKey("goal_mode")
         val DAILY_LIMIT_MINUTES   = intPreferencesKey("daily_limit_minutes")
         val WATCH_LIST            = stringSetPreferencesKey("watch_list")
-        val GOAL_APPS             = stringSetPreferencesKey("goal_apps")
         val PINNED_APPS           = stringPreferencesKey("pinned_apps") // CSV — preserves order
         val ONBOARDING_COMPLETE   = booleanPreferencesKey("onboarding_complete")
     }
@@ -40,12 +34,6 @@ class UserPreferencesRepository(private val context: Context) {
             else throw exception
         }
         .map { prefs -> prefs.toUserPreferences() }
-
-    // --- Goal mode ---
-
-    suspend fun setGoalMode(mode: GoalMode) {
-        context.dataStore.edit { it[Keys.GOAL_MODE] = mode.name }
-    }
 
     // --- Daily limit ---
 
@@ -71,26 +59,6 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setWatchList(packages: Set<String>) {
         context.dataStore.edit { it[Keys.WATCH_LIST] = packages }
-    }
-
-    // --- Goal apps ---
-
-    suspend fun addToGoalApps(packageName: String) {
-        context.dataStore.edit { prefs ->
-            val current = prefs[Keys.GOAL_APPS] ?: emptySet()
-            prefs[Keys.GOAL_APPS] = current + packageName
-        }
-    }
-
-    suspend fun removeFromGoalApps(packageName: String) {
-        context.dataStore.edit { prefs ->
-            val current = prefs[Keys.GOAL_APPS] ?: emptySet()
-            prefs[Keys.GOAL_APPS] = current - packageName
-        }
-    }
-
-    suspend fun setGoalApps(packages: Set<String>) {
-        context.dataStore.edit { it[Keys.GOAL_APPS] = packages }
     }
 
     // --- Pinned apps ---
@@ -122,12 +90,8 @@ class UserPreferencesRepository(private val context: Context) {
     // --- Mapping ---
 
     private fun Preferences.toUserPreferences() = UserPreferences(
-        goalMode = GoalMode.valueOf(
-            this[Keys.GOAL_MODE] ?: GoalMode.REDUCE.name
-        ),
         dailyLimitMinutes = this[Keys.DAILY_LIMIT_MINUTES] ?: 120, // default 2h
         watchList = this[Keys.WATCH_LIST] ?: emptySet(),
-        goalApps = this[Keys.GOAL_APPS] ?: emptySet(),
         pinnedApps = (this[Keys.PINNED_APPS] ?: "")
             .split(",")
             .filter { it.isNotBlank() }

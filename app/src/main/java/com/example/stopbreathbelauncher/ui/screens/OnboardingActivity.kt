@@ -18,10 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.stopbreathbelauncher.data.GoalMode
 import com.example.stopbreathbelauncher.data.PlantState
 import com.example.stopbreathbelauncher.ui.components.AppFlag
 import com.example.stopbreathbelauncher.ui.components.AppRow
@@ -55,15 +52,10 @@ class OnboardingActivity : ComponentActivity() {
                         isDefaultLauncher  = ::isDefaultLauncher,
                         onGrantUsage       = { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
                         onSetDefault       = { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) },
-                        onSetGoalMode      = { viewModel.setGoalMode(it) },
                         onSetPinnedApps    = { viewModel.setPinnedApps(it) },
                         onSetWatchList     = { pkg, add ->
                             if (add) viewModel.addToWatchList(pkg)
                             else viewModel.removeFromWatchList(pkg)
-                        },
-                        onSetGoalApps      = { pkg, add ->
-                            if (add) viewModel.addToGoalApps(pkg)
-                            else viewModel.removeFromGoalApps(pkg)
                         },
                         onFinish = {
                             viewModel.setOnboardingComplete()
@@ -110,19 +102,15 @@ fun OnboardingFlow(
     isDefaultLauncher: () -> Boolean,
     onGrantUsage: () -> Unit,
     onSetDefault: () -> Unit,
-    onSetGoalMode: (GoalMode) -> Unit,
     onSetPinnedApps: (List<String>) -> Unit,
     onSetWatchList: (String, Boolean) -> Unit,
-    onSetGoalApps: (String, Boolean) -> Unit,
     onFinish: () -> Unit,
 ) {
     var step by remember { mutableIntStateOf(1) }
-    var selectedGoal by remember { mutableStateOf(GoalMode.REDUCE) }
     var pinnedPackages by remember { mutableStateOf<List<String>>(emptyList()) }
     var watchList by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var goalApps by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    val totalSteps = if (selectedGoal == GoalMode.REDIRECT) 7 else 6
+    val totalSteps = 6
 
     Column(
         modifier = Modifier
@@ -145,15 +133,7 @@ fun OnboardingFlow(
                     onSet      = onSetDefault,
                     onNext     = { step = 4 },
                 )
-                4 -> StepGoalMode(
-                    selected   = selectedGoal,
-                    onSelect   = {
-                        selectedGoal = it
-                        onSetGoalMode(it)
-                    },
-                    onNext     = { step = 5 },
-                )
-                5 -> StepPinnedApps(
+                4 -> StepPinnedApps(
                     allApps    = allApps,
                     pinned     = pinnedPackages,
                     onToggle   = { pkg ->
@@ -168,7 +148,7 @@ fun OnboardingFlow(
                         step = 6
                     },
                 )
-                6 -> StepWatchList(
+                5 -> StepWatchList(
                     allApps    = allApps,
                     watchList  = watchList,
                     onToggle   = { pkg ->
@@ -176,19 +156,8 @@ fun OnboardingFlow(
                         onSetWatchList(pkg, !watchList.contains(pkg))
                     },
                     onNext     = {
-                        if (selectedGoal == GoalMode.REDIRECT) step = 7
-                        else onFinish()
+                        onFinish()
                     },
-                    isLastStep = selectedGoal == GoalMode.REDUCE,
-                )
-                7 -> StepGoalApps(
-                    allApps   = allApps,
-                    goalApps  = goalApps,
-                    onToggle  = { pkg ->
-                        goalApps = if (goalApps.contains(pkg)) goalApps - pkg else goalApps + pkg
-                        onSetGoalApps(pkg, !goalApps.contains(pkg))
-                    },
-                    onNext    = onFinish,
                 )
             }
         }
@@ -293,55 +262,7 @@ private fun StepDefaultLauncher(isDefault: Boolean, onSet: () -> Unit, onNext: (
     }
 }
 
-// ── Step 4: Goal mode ─────────────────────────────────────────────────────────
-
-@Composable
-private fun StepGoalMode(selected: GoalMode, onSelect: (GoalMode) -> Unit, onNext: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
-        Column {
-            StepLabel("SETUP_04")
-            Text("YOUR GOAL", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
-            Spacer(Modifier.height(8.dp))
-            Text("What are you here to change?", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextSecondary)
-            Spacer(Modifier.height(24.dp))
-
-            listOf(
-                GoalMode.REDUCE   to ("REDUCE" to "Use my phone less.\nSet a daily limit. Get nudged when you're close."),
-                GoalMode.REDIRECT to ("REDIRECT" to "Use my phone better.\nBalance time on bad apps with time on good ones."),
-            ).forEach { (mode, pair) ->
-                val (tag, desc) = pair
-                val isSelected = selected == mode
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(2.dp, if (isSelected) SbbColors.PlantGreen else SbbColors.Border)
-                        .background(if (isSelected) SbbColors.GoalGreenBg else SbbColors.Surface)
-                        .clickable { onSelect(mode) }
-                        .padding(16.dp),
-                ) {
-                    Box(modifier = Modifier
-                        .background(if (isSelected) SbbColors.GoalGreenBg else SbbColors.SurfaceVariant)
-                        .border(1.dp, if (isSelected) SbbColors.GoalGreenBorder else SbbColors.Border)
-                        .padding(horizontal = 5.dp, vertical = 1.dp)) {
-                        Text(tag, style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected) SbbColors.GoalGreenLight else SbbColors.TextMuted)
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(if (mode == GoalMode.REDUCE) "Use my phone less" else "Use my phone better",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = if (isSelected) SbbColors.PlantGreen else SbbColors.TextPrimary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(desc, style = MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) SbbColors.GoalGreenLight else SbbColors.TextMuted)
-                }
-                Spacer(Modifier.height(10.dp))
-            }
-        }
-        OnboardingButton("[ NEXT → ]", onClick = onNext)
-    }
-}
-
-// ── Step 5: Pinned apps ───────────────────────────────────────────────────────
+// ── Step 4: Pinned apps ───────────────────────────────────────────────────────
 
 @Composable
 private fun StepPinnedApps(
@@ -392,7 +313,7 @@ private fun StepPinnedApps(
                 val isPinned = pinned.contains(app.packageName)
                 AppRow(
                     app       = app,
-                    flag      = if (isPinned) AppFlag.GOAL else AppFlag.NONE,
+                    flag      = AppFlag.NONE,
                     isFocused = isFocused,
                     scale     = scale,
                     onClick   = { onToggle(app.packageName) },
@@ -426,7 +347,6 @@ private fun StepWatchList(
     watchList: Set<String>,
     onToggle: (String) -> Unit,
     onNext: () -> Unit,
-    isLastStep: Boolean,
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
 
@@ -445,7 +365,7 @@ private fun StepWatchList(
                         .background(SbbColors.WatchRedBg)
                         .border(1.dp, SbbColors.WatchRedBorder)
                         .padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = SbbColors.WatchRedLight)
+                        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = SbbColors.WatchRed)
                     }
                 }
             }
@@ -480,7 +400,7 @@ private fun StepWatchList(
 
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OnboardingButton(
-                label  = if (isLastStep) "[ FINISH ]" else "[ NEXT → ]",
+                label  = "[ FINISH ]",
                 onClick = onNext,
             )
             Text(
@@ -489,63 +409,6 @@ private fun StepWatchList(
                 color    = SbbColors.TextDim,
                 modifier = Modifier.align(Alignment.CenterHorizontally).clickable { onNext() },
             )
-        }
-    }
-}
-
-// ── Step 7: Goal apps (Redirect only) ─────────────────────────────────────────
-
-@Composable
-private fun StepGoalApps(
-    allApps: List<AppInfo>,
-    goalApps: Set<String>,
-    onToggle: (String) -> Unit,
-    onNext: () -> Unit,
-) {
-    var selectedIndex by remember { mutableIntStateOf(0) }
-
-    Column(modifier = Modifier.fillMaxSize().background(SbbColors.Background)) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            StepLabel("SETUP_07")
-            Text("GOAL APPS", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
-            Spacer(Modifier.height(4.dp))
-            Text("Apps you want to use more. Time here helps your plant recover.",
-                style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextSecondary)
-        }
-
-        Divider()
-
-        Box(modifier = Modifier.weight(1f)) {
-            LineWheelScroll(
-                items          = allApps,
-                selectedIndex  = selectedIndex,
-                onItemSelected = { selectedIndex = it },
-                thumbColor     = SbbColors.GoalGreen,
-            ) { app, isFocused, scale ->
-                val isGoal = goalApps.contains(app.packageName)
-                AppRow(
-                    app       = app,
-                    flag      = if (isGoal) AppFlag.GOAL else AppFlag.NONE,
-                    isFocused = isFocused,
-                    scale     = scale,
-                    onClick   = { onToggle(app.packageName) },
-                    hint      = when {
-                        isFocused && isGoal  -> "GOAL ✓ — TAP TO REMOVE"
-                        isFocused && !isGoal -> "TAP TO ADD TO GOAL APPS"
-                        else -> null
-                    },
-                )
-            }
-        }
-
-        Divider()
-
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OnboardingButton("[ FINISH ]", onClick = onNext)
-            Text("OR SKIP FOR NOW",
-                style    = MaterialTheme.typography.labelSmall,
-                color    = SbbColors.TextDim,
-                modifier = Modifier.align(Alignment.CenterHorizontally).clickable { onNext() })
         }
     }
 }
