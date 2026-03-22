@@ -189,15 +189,32 @@ fun SettingsScreen(
 
         // ── Watch List ──────────────────────────────────────────────────────
 
-        SectionLabel("WATCH LIST")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("WATCH LIST", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
+            Box(
+                modifier = Modifier
+                    .background(SbbColors.Surface)
+                    .border(1.dp, SbbColors.Border)
+                    .clickable { showAppPicker = AppFlag.WATCH }
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+            ) {
+                Text("+ ADD", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextMuted)
+            }
+        }
         FlowChips(
-            packages  = prefs.watchList,
-            allApps   = uiState.allApps,
-            chipColor = SbbColors.WatchRed,
-            chipBg    = SbbColors.WatchRedBg,
+            packages   = prefs.watchList,
+            allApps    = uiState.allApps,
+            chipColor  = SbbColors.TextPrimary,
+            chipBg     = SbbColors.WatchRedBg,
             chipBorder = SbbColors.WatchRedBorder,
-            onRemove  = { viewModel.removeFromWatchList(it) },
-            onAdd     = { showAppPicker = AppFlag.WATCH },
+            onRemove   = { viewModel.removeFromWatchList(it) },
+            onAdd      = { showAppPicker = AppFlag.WATCH },
         )
 
         SectionDivider()
@@ -499,33 +516,30 @@ private fun FlowChips(
     onRemove: (String) -> Unit,
     onAdd: () -> Unit,
 ) {
-    // Simple row wrap using a column of rows
-    val items = packages.toList()
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).padding(bottom = 12.dp)) {
-        Box(
-            modifier = Modifier
-                .background(SbbColors.Surface)
-                .border(1.dp, SbbColors.Border)
-                .clickable { onAdd() }
-                .padding(start = 6.dp, end = 6.dp, top = 0.dp, bottom = 12.dp),
-        ) {
-            Text("+ ADD APP", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextMuted)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            items.forEach { pkg ->
-                val app = allApps.find { it.packageName == pkg }
-                AppIconSlot(
-                    app         = app,
-                    badge       = {
-                        Text(
-                            "[×]",
-                            style    = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.clickable { onRemove(pkg) },
-                        )
-                    },
-                )
-            }
+    var localPackages by remember(packages) { mutableStateOf(packages) }
 
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
+        localPackages.forEach { pkg ->
+            val app = allApps.find { it.packageName == pkg }
+            AppIconSlot(
+                app         = app,
+                bgColor     = chipBg,
+                badge = {
+                    Text(
+                        "×",
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = chipColor.copy(alpha = 0.6f),
+                        modifier = Modifier.clickable {
+                            localPackages = localPackages - pkg
+                            onRemove(pkg)
+                        },
+                    )
+                },
+            )
         }
     }
 }

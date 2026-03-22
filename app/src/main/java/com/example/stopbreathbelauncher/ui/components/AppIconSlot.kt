@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,9 +34,7 @@ fun AppIconSlot(
         remember(it.packageName) { it.icon.toBitmap(128, 128).asImageBitmap() }
     }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+    Box(
         modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier,
     ) {
         Box(
@@ -46,12 +46,22 @@ fun AppIconSlot(
             if (bitmap != null) {
                 Image(
                     bitmap             = bitmap,
-                    contentDescription = app.label,
+                    contentDescription = app?.label,
+                    modifier           = Modifier.size(size * 0.7f),
                 )
             } else {
                 Text("?", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextDim)
             }
         }
-        badge?.invoke()
+
+        if (badge != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp).offset( x=0.dp, y=(-6).dp),
+            ) {
+                badge()
+            }
+        }
     }
 }
