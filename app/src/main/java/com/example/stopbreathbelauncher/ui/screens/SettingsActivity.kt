@@ -140,7 +140,6 @@ fun SettingsScreen(
             activeSlot   = slotIndex,
             onPick       = { app ->
                 viewModel.swapPinnedApp(slotIndex, app.packageName)
-                showDockPicker = null
             },
             onBack       = { showDockPicker = null },
         )
@@ -158,7 +157,6 @@ fun SettingsScreen(
                     AppFlag.WATCH -> viewModel.addToWatchList(app.packageName)
                     AppFlag.NONE  -> {}
                 }
-                showAppPicker = null
             },
             onRemove   = { pkg -> viewModel.removeFromWatchList(pkg) },
             onBack     = { showAppPicker = null },
