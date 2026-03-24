@@ -47,7 +47,6 @@ fun AppIconSlot(
                 Image(
                     bitmap             = bitmap,
                     contentDescription = app?.label,
-                    modifier           = Modifier.size(size * 0.7f),
                 )
             } else {
                 Text("?", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextDim)

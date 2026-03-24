@@ -4,10 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,9 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import com.example.stopbreathbelauncher.ui.components.AppFlag
 import com.example.stopbreathbelauncher.ui.components.AppIconSlot
 import com.example.stopbreathbelauncher.ui.theme.SbbColors
@@ -41,15 +40,72 @@ class SettingsActivity : ComponentActivity() {
                 SbbScaffold {
                     val uiState by viewModel.uiState.collectAsState()
                     SettingsScreen(
-                        uiState    = uiState,
-                        viewModel  = viewModel,
-                        onBack     = { finish() },
+                        uiState   = uiState,
+                        viewModel = viewModel,
+                        onBack    = { finish() },
                     )
                 }
             }
         }
     }
 }
+
+// ── Shared app icon strip ─────────────────────────────────────────────────────
+
+/**
+ * A horizontally-scrollable row of [AppIconSlot]s with optional remove badges.
+ * Used in both the Settings watch-list and the AddAppPicker summary footer.
+ *
+ * @param packages   Ordered set of package names to display.
+ * @param allApps    Full app list used to resolve package → AppInfo.
+ * @param chipBg     Background tint for each slot.
+ * @param chipColor  Accent color used for the "×" badge.
+ * @param onRemove   Called with the package name when a badge is tapped.
+ *                   Pass null to hide badges entirely (read-only strip).
+ */
+@Composable
+fun AppIconStrip(
+    packages: Collection<String>,
+    allApps: List<AppInfo>,
+    chipBg: Color,
+    chipColor: Color,
+    onRemove: ((String) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+    ) {
+        if (packages.isEmpty()) {
+            Text(
+                "NONE YET",
+                style = MaterialTheme.typography.labelSmall,
+                color = SbbColors.TextDim,
+            )
+        } else {
+            packages.forEach { pkg ->
+                val app = allApps.find { it.packageName == pkg }
+                AppIconSlot(
+                    app     = app,
+                    bgColor = chipBg,
+                    badge   = if (onRemove != null) {
+                        {
+                            Text(
+                                "×",
+                                style    = MaterialTheme.typography.labelSmall,
+                                color    = chipColor.copy(alpha = 0.6f),
+                                modifier = Modifier.clickable { onRemove(pkg) },
+                            )
+                        }
+                    } else null,
+                )
+            }
+        }
+    }
+}
+
+// ── SettingsScreen ────────────────────────────────────────────────────────────
 
 @Composable
 fun SettingsScreen(
@@ -60,8 +116,8 @@ fun SettingsScreen(
     val prefs  = uiState.preferences
     val streak = uiState.streakData
 
-    var showDockPicker   by remember { mutableStateOf<Int?>(null) }           // slot index
-    var showAppPicker    by remember { mutableStateOf<AppFlag?>(null) }       // which list
+    var showDockPicker by remember { mutableStateOf<Int?>(null) }
+    var showAppPicker  by remember { mutableStateOf<AppFlag?>(null) }
 
     var limitSlider by remember(prefs.dailyLimitMinutes) {
         mutableFloatStateOf(prefs.dailyLimitMinutes.toFloat())
@@ -78,15 +134,15 @@ fun SettingsScreen(
     // Dock picker overlay
     showDockPicker?.let { slotIndex ->
         AppPickerScreen(
-            apps       = uiState.allApps,
-            title      = "REPLACING SLOT ${slotIndex + 1}",
+            apps         = uiState.allApps,
+            title        = "REPLACING SLOT ${slotIndex + 1}",
             currentSlots = uiState.pinnedApps.map { it?.packageName ?: "" },
-            activeSlot = slotIndex,
-            onPick     = { app ->
+            activeSlot   = slotIndex,
+            onPick       = { app ->
                 viewModel.swapPinnedApp(slotIndex, app.packageName)
                 showDockPicker = null
             },
-            onBack     = { showDockPicker = null },
+            onBack       = { showDockPicker = null },
         )
         return
     }
@@ -104,6 +160,7 @@ fun SettingsScreen(
                 }
                 showAppPicker = null
             },
+            onRemove   = { pkg -> viewModel.removeFromWatchList(pkg) },
             onBack     = { showAppPicker = null },
         )
         return
@@ -124,16 +181,20 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("SETTINGS", style = MaterialTheme.typography.headlineMedium, color = SbbColors.TextPrimary)
-            Text("[←]", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextMuted,
-                modifier = Modifier.clickable { onBack() })
+            Text(
+                "[←]",
+                style    = MaterialTheme.typography.bodyLarge,
+                color    = SbbColors.TextMuted,
+                modifier = Modifier.clickable { onBack() },
+            )
         }
 
         Divider()
 
         // Limit scrubber
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            val hrs = (limitSlider / 60).toInt()
-            val mins = (limitSlider % 60).toInt()
+            val hrs     = (limitSlider / 60).toInt()
+            val mins    = (limitSlider % 60).toInt()
             val display = if (hrs > 0) "${hrs}H ${mins}M" else "${mins}M"
             Text(
                 text  = "Nudge me after $display total on watch list apps per day",
@@ -141,44 +202,54 @@ fun SettingsScreen(
                 color = SbbColors.TextSecondary,
             )
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment   = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text("30M", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextDim)
                 Slider(
-                    value         = limitSlider,
-                    onValueChange = { limitSlider = it },
+                    value                 = limitSlider,
+                    onValueChange         = { limitSlider = it },
                     onValueChangeFinished = { viewModel.setDailyLimitMinutes(limitSlider.roundToInt()) },
-                    valueRange    = 30f..240f,
-                    steps         = 13,
-                    modifier      = Modifier.weight(1f),
-                    colors        = SliderDefaults.colors(
-                        thumbColor       = SbbColors.PlantGreen,
-                        activeTrackColor = SbbColors.PlantGreenDark,
+                    valueRange            = 30f..240f,
+                    steps                 = 13,
+                    modifier              = Modifier.weight(1f),
+                    colors                = SliderDefaults.colors(
+                        thumbColor         = SbbColors.PlantGreen,
+                        activeTrackColor   = SbbColors.PlantGreenDark,
                         inactiveTrackColor = SbbColors.Border,
                     ),
                 )
                 Text("4H", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextDim)
-                Text(display, style = MaterialTheme.typography.titleLarge, color = SbbColors.PlantGreen,
-                    modifier = Modifier.width(48.dp))
+                Text(
+                    display,
+                    style    = MaterialTheme.typography.titleLarge,
+                    color    = SbbColors.PlantGreen,
+                    modifier = Modifier.width(48.dp),
+                )
             }
         }
 
         SectionDivider()
 
-        // ── Pinned Dock ─────────────────────────────────────────────────────
+        // ── Pinned Dock ──────────────────────────────────────────────────────
 
         SectionLabel("PINNED DOCK")
-        Text("TAP ANY SLOT TO SWAP",
-            style = MaterialTheme.typography.labelSmall,
-            color = SbbColors.TextDim,
-            modifier = Modifier.padding(horizontal = 16.dp))
+        Text(
+            "TAP ANY SLOT TO SWAP",
+            style    = MaterialTheme.typography.labelSmall,
+            color    = SbbColors.TextDim,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
         Spacer(Modifier.height(8.dp))
-
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp).padding(bottom = 12.dp),
+            modifier              = Modifier
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             uiState.pinnedApps.forEachIndexed { index, app ->
-                DockSlotEditor(
+                AppIconSlot(
                     app     = app,
                     onClick = { showDockPicker = index },
                 )
@@ -187,14 +258,14 @@ fun SettingsScreen(
 
         SectionDivider()
 
-        // ── Watch List ──────────────────────────────────────────────────────
+        // ── Watch List ───────────────────────────────────────────────────────
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
         ) {
             Text("WATCH LIST", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
             Box(
@@ -207,19 +278,24 @@ fun SettingsScreen(
                 Text("+ ADD", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextMuted)
             }
         }
-        FlowChips(
-            packages   = prefs.watchList,
-            allApps    = uiState.allApps,
-            chipColor  = SbbColors.TextPrimary,
-            chipBg     = SbbColors.WatchRedBg,
-            chipBorder = SbbColors.WatchRedBorder,
-            onRemove   = { viewModel.removeFromWatchList(it) },
-            onAdd      = { showAppPicker = AppFlag.WATCH },
+
+        // Shared strip — removal wired directly to viewModel here
+        var localWatchList by remember(prefs.watchList) { mutableStateOf(prefs.watchList) }
+        AppIconStrip(
+            packages  = localWatchList,
+            allApps   = uiState.allApps,
+            chipBg    = SbbColors.WatchRedBg,
+            chipColor = SbbColors.TextPrimary,
+            onRemove  = { pkg ->
+                localWatchList = localWatchList - pkg
+                viewModel.removeFromWatchList(pkg)
+            },
+            modifier  = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         )
 
         SectionDivider()
 
-        // ── Plant ───────────────────────────────────────────────────────────
+        // ── Plant ────────────────────────────────────────────────────────────
 
         SectionLabel("PLANT")
 
@@ -232,23 +308,27 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelLarge,
                     color = SbbColors.PlantGreen,
                 )
-            }
+            },
         )
 
         SettingRow(
             title = "Reset streak",
             sub   = "Start over from day 1",
             right = {
-                Text("[RESET]", style = MaterialTheme.typography.bodyLarge, color = SbbColors.WatchRed,
-                    modifier = Modifier.clickable { viewModel.resetStreak() })
-            }
+                Text(
+                    "[RESET]",
+                    style    = MaterialTheme.typography.bodyLarge,
+                    color    = SbbColors.WatchRed,
+                    modifier = Modifier.clickable { viewModel.resetStreak() },
+                )
+            },
         )
 
         Spacer(Modifier.height(40.dp))
     }
 }
 
-// ── App picker for dock slot ───────────────────────────────────────────────────
+// ── AppPickerScreen ───────────────────────────────────────────────────────────
 
 @Composable
 fun AppPickerScreen(
@@ -267,22 +347,25 @@ fun AppPickerScreen(
             .background(SbbColors.Background),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
         ) {
             Text("PICK APP", style = MaterialTheme.typography.headlineMedium, color = SbbColors.TextPrimary)
-            Text("[←]", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextMuted,
-                modifier = Modifier.clickable { onBack() })
+            Text(
+                "[←]",
+                style    = MaterialTheme.typography.bodyLarge,
+                color    = SbbColors.TextMuted,
+                modifier = Modifier.clickable { onBack() },
+            )
         }
 
-        // Context banner
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(SbbColors.Surface)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(title, style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
@@ -306,7 +389,7 @@ fun AppPickerScreen(
             }
         }
 
-        // Dock preview at bottom
+        // Dock preview
         Divider()
         Row(
             modifier = Modifier
@@ -314,28 +397,32 @@ fun AppPickerScreen(
                 .background(SbbColors.Surface)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             currentSlots.forEachIndexed { i, pkg ->
                 val isActive = i == activeSlot
-                val label = apps.find { it.packageName == pkg }?.label?.take(5) ?: "?"
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(if (isActive) SbbColors.GoalGreenBg else SbbColors.SurfaceVariant)
-                            .border(2.dp, if (isActive) SbbColors.PlantGreen else SbbColors.Border),
-                        contentAlignment = Alignment.Center,
+                val app = apps.find { it.packageName == pkg }
+                if (isActive) {
+                    // Mirror EmptyDockSlot but with green highlight to show "this slot"
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Text(
-                            if (isActive) "?" else label.take(2),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (isActive) SbbColors.PlantGreen else SbbColors.TextMuted,
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .background(SbbColors.GoalGreenBg)
+                                .border(2.dp, SbbColors.PlantGreen),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("?", style = MaterialTheme.typography.bodyLarge, color = SbbColors.PlantGreen)
+                        }
+                        Text("SLOT ${i + 1}", style = MaterialTheme.typography.labelSmall, color = SbbColors.PlantGreen)
                     }
-                    Text(
-                        if (isActive) "SLOT ${i+1}" else label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isActive) SbbColors.PlantGreen else SbbColors.TextMuted,
+                } else {
+                    AppIconSlot(
+                        app  = app,
+                        size = 52.dp,
                     )
                 }
             }
@@ -343,7 +430,7 @@ fun AppPickerScreen(
     }
 }
 
-// ── Add app picker (watch/goal) ───────────────────────────────────────────────
+// ── AddAppPickerScreen ────────────────────────────────────────────────────────
 
 @Composable
 fun AddAppPickerScreen(
@@ -351,10 +438,14 @@ fun AddAppPickerScreen(
     watchList: Set<String>,
     targetFlag: AppFlag,
     onAdd: (AppInfo) -> Unit,
+    onRemove: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
     var currentTarget by remember { mutableStateOf(targetFlag) }
+
+    // Local copy so strip updates immediately without waiting for DataStore round-trip
+    var localWatchList by remember(watchList) { mutableStateOf(watchList) }
 
     Column(
         modifier = Modifier
@@ -362,13 +453,17 @@ fun AddAppPickerScreen(
             .background(SbbColors.Background),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier              = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
         ) {
             Text("ADD APP", style = MaterialTheme.typography.headlineMedium, color = SbbColors.TextPrimary)
-            Text("[←]", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextMuted,
-                modifier = Modifier.clickable { onBack() })
+            Text(
+                "[←]",
+                style    = MaterialTheme.typography.bodyLarge,
+                color    = SbbColors.TextMuted,
+                modifier = Modifier.clickable { onBack() },
+            )
         }
 
         // Mode toggle banner
@@ -378,20 +473,14 @@ fun AddAppPickerScreen(
                 .background(SbbColors.Surface)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
         ) {
             Text("ADDING TO", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
             Row(modifier = Modifier.border(1.dp, SbbColors.BorderStrong)) {
                 listOf(AppFlag.WATCH to "WATCH LIST").forEach { (flag, label) ->
-                    val selected = currentTarget == flag
-                    val bgColor = when {
-                        selected && flag == AppFlag.WATCH -> SbbColors.WatchRedBg
-                        else -> SbbColors.Surface
-                    }
-                    val textColor = when {
-                        selected && flag == AppFlag.WATCH -> SbbColors.WatchRed
-                        else -> SbbColors.TextMuted
-                    }
+                    val selected  = currentTarget == flag
+                    val bgColor   = if (selected && flag == AppFlag.WATCH) SbbColors.WatchRedBg else SbbColors.Surface
+                    val textColor = if (selected && flag == AppFlag.WATCH) SbbColors.WatchRed else SbbColors.TextMuted
                     Text(
                         text     = label,
                         style    = MaterialTheme.typography.labelLarge,
@@ -414,11 +503,8 @@ fun AddAppPickerScreen(
                 onItemSelected = { selectedIndex = it },
                 thumbColor     = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRed else SbbColors.GoalGreen,
             ) { app, isFocused, scale ->
-                val existingFlag = when {
-                    app.packageName in watchList -> AppFlag.WATCH
-                    else -> AppFlag.NONE
-                }
-                val alreadyAdded = existingFlag == currentTarget
+                val existingFlag  = if (app.packageName in localWatchList) AppFlag.WATCH else AppFlag.NONE
+                val alreadyAdded  = existingFlag == currentTarget
                 com.example.stopbreathbelauncher.ui.components.AppRow(
                     app       = app,
                     flag      = existingFlag,
@@ -429,33 +515,30 @@ fun AddAppPickerScreen(
             }
         }
 
-        // Current list summary
+        // Current list summary footer — uses shared AppIconStrip
         Divider()
-        val currentList = if (currentTarget == AppFlag.WATCH) watchList else emptyList()
-        val label = if (currentTarget == AppFlag.WATCH) "CURRENT WATCH LIST" else "CURRENT GOAL APPS"
-        val chipColor = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRed else SbbColors.GoalGreenLight
-        val chipBg = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRedBg else SbbColors.GoalGreenBg
-        val chipBorder = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRedBorder else SbbColors.GoalGreenBorder
+        val currentList  = if (currentTarget == AppFlag.WATCH) localWatchList else emptySet()
+        val footerLabel  = if (currentTarget == AppFlag.WATCH) "CURRENT WATCH LIST" else "CURRENT GOAL APPS"
+        val chipBg       = if (currentTarget == AppFlag.WATCH) SbbColors.WatchRedBg else SbbColors.GoalGreenBg
+        val chipColor    = SbbColors.TextPrimary   // consistent with Settings screen
 
-        Column(modifier = Modifier.background(SbbColors.Surface).padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
+        Column(
+            modifier = Modifier
+                .background(SbbColors.Surface)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text(footerLabel, style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
             Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                currentList.take(5).forEach { pkg ->
-                    val appLabel = apps.find { it.packageName == pkg }?.label?.take(8) ?: pkg.take(8)
-                    Box(
-                        modifier = Modifier
-                            .background(chipBg)
-                            .border(1.dp, chipBorder)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    ) {
-                        Text(appLabel.uppercase(), style = MaterialTheme.typography.labelSmall, color = chipColor)
-                    }
-                }
-                if (currentList.isEmpty()) {
-                    Text("NONE YET", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
-                }
-            }
+            AppIconStrip(
+                packages  = currentList,
+                allApps   = apps,
+                chipBg    = chipBg,
+                chipColor = chipColor,
+                onRemove  = { pkg ->
+                    localWatchList = localWatchList - pkg
+                    onRemove(pkg)
+                },
+            )
         }
     }
 }
@@ -489,57 +572,12 @@ private fun SettingRow(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = SbbColors.TextPrimary)
             Text(sub, style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
         }
         right()
-    }
-}
-
-@Composable
-private fun DockSlotEditor(app: AppInfo?, onClick: () -> Unit) {
-    AppIconSlot(
-        app         = app,
-        onClick     = onClick,
-    )
-}
-@Composable
-private fun FlowChips(
-    packages: Set<String>,
-    allApps: List<AppInfo>,
-    chipColor: androidx.compose.ui.graphics.Color,
-    chipBg: androidx.compose.ui.graphics.Color,
-    chipBorder: androidx.compose.ui.graphics.Color,
-    onRemove: (String) -> Unit,
-    onAdd: () -> Unit,
-) {
-    var localPackages by remember(packages) { mutableStateOf(packages) }
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-    ) {
-        localPackages.forEach { pkg ->
-            val app = allApps.find { it.packageName == pkg }
-            AppIconSlot(
-                app         = app,
-                bgColor     = chipBg,
-                badge = {
-                    Text(
-                        "×",
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = chipColor.copy(alpha = 0.6f),
-                        modifier = Modifier.clickable {
-                            localPackages = localPackages - pkg
-                            onRemove(pkg)
-                        },
-                    )
-                },
-            )
-        }
     }
 }
