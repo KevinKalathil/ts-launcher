@@ -213,7 +213,6 @@ private fun StepWelcome(onNext: () -> Unit) {
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
-            StepLabel("SETUP_01")
             Spacer(Modifier.height(8.dp))
             Text("Tend", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(16.dp))
@@ -241,7 +240,6 @@ private fun StepUsagePermission(isGranted: Boolean, onGrant: () -> Unit, onNext:
         .fillMaxSize()
         .padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column {
-            StepLabel("SETUP_02")
             Text("USAGE ACCESS", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(12.dp))
             Text(
@@ -291,7 +289,6 @@ private fun StepDefaultLauncher(isDefault: Boolean, onSet: () -> Unit, onNext: (
         .fillMaxSize()
         .padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column {
-            StepLabel("SETUP_03")
             Text("SET AS DEFAULT", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(12.dp))
             Text(
@@ -350,7 +347,6 @@ private fun StepPinnedApps(
         .fillMaxSize()
         .background(SbbColors.Background)) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            StepLabel("SETUP_04")
             Text("PICK 4 DOCK APPS", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(4.dp))
             Text(
@@ -419,7 +415,6 @@ private fun StepWatchList(
         .fillMaxSize()
         .background(SbbColors.Background)) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            StepLabel("SETUP_05")
             Text("WATCH LIST", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(4.dp))
             Text(
@@ -503,7 +498,6 @@ private fun StepDailyLimit(
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
-            StepLabel("SETUP_06")
             Text(
                 "DAILY LIMIT",
                 style = MaterialTheme.typography.headlineLarge,
@@ -594,12 +588,6 @@ private fun StepProgress(current: Int, total: Int) {
         Spacer(Modifier.height(4.dp))
         Text("STEP $current OF $total", style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
     }
-}
-
-@Composable
-private fun StepLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelSmall, color = SbbColors.TextDim)
-    Spacer(Modifier.height(4.dp))
 }
 
 @Composable
