@@ -1,12 +1,15 @@
 package com.example.stopbreathbelauncher.data
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.io.IOException
 
 // Top-level DataStore instance — one per app
@@ -20,6 +23,34 @@ data class UserPreferences(
 )
 
 class UserPreferencesRepository(private val context: Context) {
+
+    init {
+        logCurrentPreferences()
+    }
+
+    private fun logCurrentPreferences() {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                val prefs = context.dataStore.data.first()
+
+                val all = prefs.asMap()
+
+                Log.d("PrefsDebug", "---- RAW DATASTORE DUMP ----")
+                all.forEach { (key, value) ->
+                    Log.d("PrefsDebug", "${key.name} = $value")
+                }
+
+                Log.d("PrefsDebug", "---- PARSED ----")
+                Log.d("PrefsDebug", "dailyLimitMinutes = ${prefs[Keys.DAILY_LIMIT_MINUTES]}")
+                Log.d("PrefsDebug", "watchList = ${prefs[Keys.WATCH_LIST]}")
+                Log.d("PrefsDebug", "pinnedApps = ${prefs[Keys.PINNED_APPS]}")
+                Log.d("PrefsDebug", "onboardingComplete = ${prefs[Keys.ONBOARDING_COMPLETE]}")
+
+            } catch (e: Exception) {
+                Log.e("PrefsDebug", "Error reading DataStore", e)
+            }
+        }
+    }
 
     private object Keys {
         val DAILY_LIMIT_MINUTES   = intPreferencesKey("daily_limit_minutes")
@@ -57,10 +88,6 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
-    suspend fun setWatchList(packages: Set<String>) {
-        context.dataStore.edit { it[Keys.WATCH_LIST] = packages }
-    }
-
     // --- Pinned apps ---
     // Stored as CSV string to preserve order (DataStore Set is unordered)
 
@@ -85,6 +112,7 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setOnboardingComplete(complete: Boolean) {
         context.dataStore.edit { it[Keys.ONBOARDING_COMPLETE] = complete }
+        context.dataStore.data.first() // force flush before returning
     }
 
     // --- Mapping ---

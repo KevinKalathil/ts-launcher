@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.stopbreathbelauncher.data.*
+import com.example.stopbreathbelauncher.ui.theme.SbbColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -25,6 +26,7 @@ data class AppInfo(
     val icon: Drawable,
     val usageTimeMs: Long,
     val openCount: Int,
+    val nudgeThresholdCrossed: Boolean = false,
 )
 
 data class LauncherUiState(
@@ -48,9 +50,11 @@ data class LauncherUiState(
     val nudgeThresholdCrossed: Boolean = false,
 )
 
+enum class UsageStatus { NORMAL, WARNING, EXCEEDED }
+
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val context = application.applicationContext
+    private val context get() = getApplication<Application>()
     private val packageManager = context.packageManager
 
     private val prefsRepo  = UserPreferencesRepository(context)
@@ -142,16 +146,21 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun refreshApps() {
         viewModelScope.launch(Dispatchers.IO) {
             if (!hasUsagePermission()) return@launch
+            val prefs = prefsRepo.userPreferences.first()
+            val limitMs = prefs.dailyLimitMinutes * 60 * 1000L
             val usageMap  = getTodayUsageStats()
             val openCount = getTodayOpenCounts()
-            _rawApps.value = getInstalledApps(usageMap, openCount)
+            _rawApps.value = getInstalledApps(usageMap, openCount, prefs.watchList, limitMs)
         }
     }
 
     fun onAppClicked(app: AppInfo) {
         val state = uiState.value
-        val isWatchListed = app.packageName in state.preferences.watchList
-        if (isWatchListed && state.nudgeThresholdCrossed) {
+        val limitMs = state.preferences.dailyLimitMinutes * 60 * 1000L
+        val proportion = if (limitMs > 0) app.usageTimeMs.toFloat() / limitMs else 0f
+        val usageStatus = getUsageStatus(proportion)
+        if (app.packageName in state.preferences.watchList &&
+            (usageStatus == UsageStatus.WARNING || usageStatus == UsageStatus.EXCEEDED)) {
             _nudgeApp.value = app
         }
     }
@@ -161,6 +170,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun resetStreak() {
         viewModelScope.launch { streakRepo.resetStreak() }
     }
+
+    suspend fun isOnboardingComplete(): Boolean =
+        prefsRepo.userPreferences.first().onboardingComplete
 
     fun setDailyLimitMinutes(minutes: Int) {
         viewModelScope.launch { prefsRepo.setDailyLimitMinutes(minutes) }
@@ -180,10 +192,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun swapPinnedApp(slotIndex: Int, packageName: String) {
         viewModelScope.launch { prefsRepo.swapPinnedApp(slotIndex, packageName) }
-    }
-
-    fun setOnboardingComplete() {
-        viewModelScope.launch { prefsRepo.setOnboardingComplete(true) }
     }
 
     private fun getTodayUsageStats(): Map<String, Long> {
@@ -221,6 +229,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
         return usageMap
     }
+
     private fun getTodayOpenCounts(): Map<String, Int> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val counts = mutableMapOf<String, Int>()
@@ -238,6 +247,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private fun getInstalledApps(
         usageMap: Map<String, Long>,
         openCounts: Map<String, Int>,
+        watchList: Set<String>,
+        limitMs: Long,
     ): List<AppInfo> {
         val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
         return packageManager
@@ -245,13 +256,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             .mapNotNull { info ->
                 val pkg = info.activityInfo.packageName
                 if (pkg == context.packageName) return@mapNotNull null
+                val usageMs = usageMap[pkg] ?: 0L
                 try {
                     AppInfo(
-                        packageName = pkg,
-                        label       = info.loadLabel(packageManager).toString(),
-                        icon        = info.loadIcon(packageManager),
-                        usageTimeMs = usageMap[pkg] ?: 0L,
-                        openCount   = openCounts[pkg] ?: 0,
+                        packageName          = pkg,
+                        label                = info.loadLabel(packageManager).toString(),
+                        icon                 = info.loadIcon(packageManager),
+                        usageTimeMs          = usageMs,
+                        openCount            = openCounts[pkg] ?: 0,
+                        nudgeThresholdCrossed = pkg in watchList && usageMs >= limitMs,
                     )
                 } catch (e: Exception) { null }
             }
@@ -268,4 +281,38 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             context.packageName,
         ) == AppOpsManager.MODE_ALLOWED
     }
+
+    companion object {
+        fun formatUsageTime(usageMs: Long, totalMs: Long = 0L): String {
+            if (usageMs == 0L) return "NO USAGE"
+            val minutes = usageMs / 1000 / 60
+            val hours = minutes / 60
+            val remainingMinutes = minutes % 60
+            val timeStr = when {
+                hours > 0   -> "${hours}H ${remainingMinutes}M"
+                minutes > 0 -> "${minutes}M"
+                else        -> "< 1M"
+            }
+            return if (totalMs > 0L) {
+                val pct = ((usageMs.toFloat() / totalMs) * 100).toInt()
+                "$timeStr · $pct%"
+            } else {
+                timeStr
+            }
+        }
+
+        fun getUsageStatus(proportion: Float) = when {
+            proportion >= 0.9f -> UsageStatus.EXCEEDED
+            proportion >= 0.6f -> UsageStatus.WARNING
+            else               -> UsageStatus.NORMAL
+        }
+
+        fun getUsageColor(proportion: Float) = when (getUsageStatus(proportion)) {
+            UsageStatus.EXCEEDED -> SbbColors.WatchRed
+            UsageStatus.WARNING  -> SbbColors.WatchOrange
+            UsageStatus.NORMAL   -> SbbColors.TextSecondary
+        }
+
+    }
+
 }

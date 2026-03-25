@@ -1,10 +1,13 @@
 package com.example.stopbreathbelauncher.ui.screens
 
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -17,11 +20,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.example.stopbreathbelauncher.data.PlantState
 import com.example.stopbreathbelauncher.ui.components.AppFlag
 import com.example.stopbreathbelauncher.ui.components.AppRow
+import com.example.stopbreathbelauncher.ui.components.DailyLimitRow
 import com.example.stopbreathbelauncher.ui.components.PlantDisplay
 import com.example.stopbreathbelauncher.ui.scroll.LineWheelScroll
 import com.example.stopbreathbelauncher.ui.theme.SbbColors
@@ -29,6 +33,7 @@ import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
 import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
 import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
 import com.example.stopbreathbelauncher.ui.viewmodel.LauncherViewModel
+import kotlinx.coroutines.launch
 
 class OnboardingActivity : ComponentActivity() {
 
@@ -37,31 +42,28 @@ class OnboardingActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (isFullyConfigured()) {
-            goToLauncher()
-            return
-        }
-
-        setContent {
-            StopBreathBeLauncherTheme {
-                SbbScaffold {
-                    val uiState by viewModel.uiState.collectAsState()
-                    OnboardingFlow(
-                        allApps          = uiState.allApps,
-                        hasUsagePermission = ::hasUsagePermission,
-                        isDefaultLauncher  = ::isDefaultLauncher,
-                        onGrantUsage       = { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
-                        onSetDefault       = { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) },
-                        onSetPinnedApps    = { viewModel.setPinnedApps(it) },
-                        onSetWatchList     = { pkg, add ->
-                            if (add) viewModel.addToWatchList(pkg)
-                            else viewModel.removeFromWatchList(pkg)
-                        },
-                        onFinish = {
-                            viewModel.setOnboardingComplete()
-                            goToLauncher()
-                        },
-                    )
+        lifecycleScope.launch {
+            if (isFullyConfigured()) {
+                goToLauncher()
+            } else {
+                setContent {
+                    StopBreathBeLauncherTheme {
+                        SbbScaffold {
+                            val uiState by viewModel.uiState.collectAsState()
+                            OnboardingFlow(
+                                allApps            = uiState.allApps,
+                                initialPinnedApps  = uiState.preferences.pinnedApps,
+                                hasUsagePermission = ::hasUsagePermission,
+                                isDefaultLauncher  = ::isDefaultLauncher,
+                                onGrantUsage       = { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
+                                onSetDefault       = { startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) },
+                                onSetPinnedApps    = { viewModel.setPinnedApps(it) },
+                                onSetWatchList     = { pkg, add -> if (add) viewModel.addToWatchList(pkg) else viewModel.removeFromWatchList(pkg) },
+                                onSetDailyLimitMinutes = { viewModel.setDailyLimitMinutes(it) },
+                                onFinish = { goToLauncher() }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -70,10 +72,17 @@ class OnboardingActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshApps()
-        if (isFullyConfigured()) goToLauncher()
+
+        lifecycleScope.launch {
+            if (isFullyConfigured()) goToLauncher()
+        }
     }
 
-    private fun isFullyConfigured() = hasUsagePermission() && isDefaultLauncher()
+    private suspend fun isFullyConfigured(): Boolean {
+        val onboardingComplete = viewModel.isOnboardingComplete()
+        // Default launcher is now last step, not required here
+        return hasUsagePermission() && onboardingComplete
+    }
 
     private fun hasUsagePermission(): Boolean {
         val appOps = getSystemService(APP_OPS_SERVICE) as AppOpsManager
@@ -82,9 +91,16 @@ class OnboardingActivity : ComponentActivity() {
         ) == AppOpsManager.MODE_ALLOWED
     }
 
-    private fun isDefaultLauncher(): Boolean {
-        val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME) }
-        return packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName == packageName
+    fun isDefaultLauncher(): Boolean {
+        val filters = arrayListOf<IntentFilter>()
+        val activities = arrayListOf<ComponentName>()
+        packageManager.getPreferredActivities(filters, activities, packageName)
+        for (filter in filters) {
+            if (filter.hasAction(Intent.ACTION_MAIN) && filter.hasCategory(Intent.CATEGORY_HOME)) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun goToLauncher() {
@@ -98,17 +114,28 @@ class OnboardingActivity : ComponentActivity() {
 @Composable
 fun OnboardingFlow(
     allApps: List<AppInfo>,
+    initialPinnedApps: List<String>,
     hasUsagePermission: () -> Boolean,
     isDefaultLauncher: () -> Boolean,
     onGrantUsage: () -> Unit,
     onSetDefault: () -> Unit,
     onSetPinnedApps: (List<String>) -> Unit,
     onSetWatchList: (String, Boolean) -> Unit,
+    onSetDailyLimitMinutes: (Int) -> Unit,
     onFinish: () -> Unit,
 ) {
-    var step by remember { mutableIntStateOf(1) }
-    var pinnedPackages by remember { mutableStateOf<List<String>>(emptyList()) }
+    var step by remember {
+        mutableIntStateOf(
+            when {
+                !hasUsagePermission() -> 1
+                else -> 2
+            }
+        )
+    }
+
+    var pinnedPackages by remember(initialPinnedApps) { mutableStateOf(initialPinnedApps) }
     var watchList by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedSlot by remember { mutableIntStateOf(0) }
 
     val totalSteps = 6
 
@@ -117,45 +144,51 @@ fun OnboardingFlow(
             .fillMaxSize()
             .background(SbbColors.Background),
     ) {
-        // Progress bar
         StepProgress(current = step, total = totalSteps)
 
         Box(modifier = Modifier.weight(1f)) {
             when (step) {
                 1 -> StepWelcome(onNext = { step = 2 })
                 2 -> StepUsagePermission(
-                    isGranted  = hasUsagePermission(),
-                    onGrant    = onGrantUsage,
-                    onNext     = { step = 3 },
+                    isGranted = hasUsagePermission(),
+                    onGrant   = onGrantUsage,
+                    onNext    = { step = 3 },
                 )
-                3 -> StepDefaultLauncher(
-                    isDefault  = isDefaultLauncher(),
-                    onSet      = onSetDefault,
-                    onNext     = { step = 4 },
-                )
-                4 -> StepPinnedApps(
-                    allApps    = allApps,
-                    pinned     = pinnedPackages,
-                    onToggle   = { pkg ->
-                        pinnedPackages = if (pinnedPackages.contains(pkg))
-                            pinnedPackages - pkg
-                        else if (pinnedPackages.size < 4)
-                            pinnedPackages + pkg
-                        else pinnedPackages
+                3 -> StepPinnedApps(
+                    allApps      = allApps,
+                    pinned       = pinnedPackages,
+                    selectedSlot = selectedSlot,
+                    onSlotTap    = { selectedSlot = it },
+                    onAppSelected = { pkg ->
+                        val list = pinnedPackages.toMutableList()
+                        while (list.size <= selectedSlot) list.add("")
+                        list[selectedSlot] = pkg
+                        pinnedPackages = list.filter { it.isNotEmpty() }
+                        selectedSlot = (selectedSlot + 1).coerceAtMost(3)
                     },
-                    onNext     = {
+                    onNext = {
                         onSetPinnedApps(pinnedPackages)
-                        step = 6
+                        step = 4
                     },
                 )
-                5 -> StepWatchList(
-                    allApps    = allApps,
-                    watchList  = watchList,
-                    onToggle   = { pkg ->
+                4 -> StepWatchList(
+                    allApps   = allApps,
+                    watchList = watchList,
+                    onToggle  = { pkg ->
                         watchList = if (watchList.contains(pkg)) watchList - pkg else watchList + pkg
-                        onSetWatchList(pkg, !watchList.contains(pkg))
+                        onSetWatchList(pkg, watchList.contains(pkg))
                     },
-                    onNext     = {
+                    onNext = { step = 5 },
+                )
+                5 -> StepDailyLimit(
+                    onSet = { onSetDailyLimitMinutes(it) },
+                    onNext = { step = 6 }
+                )
+                6 -> StepDefaultLauncher(
+                    isDefault = isDefaultLauncher(),
+                    onSet     = onSetDefault,
+                    onNext    = {
+                        // mark onboarding complete and launch home
                         onFinish()
                     },
                 )
@@ -164,12 +197,19 @@ fun OnboardingFlow(
     }
 }
 
+// ── Remaining Step Composables ───────────────────────────────────────────────
+// StepWelcome, StepUsagePermission, StepPinnedApps, StepWatchList, StepDailyLimit, StepDefaultLauncher
+// StepProgress, StepLabel, OnboardingButton
+// [Same as your previous implementations, just updated ordering]
+// You can copy the same Composables from your current file.
 // ── Step 1: Welcome ───────────────────────────────────────────────────────────
 
 @Composable
 private fun StepWelcome(onNext: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
@@ -186,11 +226,9 @@ private fun StepWelcome(onNext: () -> Unit) {
                     .padding(10.dp),
             )
         }
-
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             PlantDisplay(state = PlantState.HEALTHY, modifier = Modifier.padding(16.dp))
         }
-
         OnboardingButton("[ BEGIN ]", onClick = onNext)
     }
 }
@@ -199,29 +237,45 @@ private fun StepWelcome(onNext: () -> Unit) {
 
 @Composable
 private fun StepUsagePermission(isGranted: Boolean, onGrant: () -> Unit, onNext: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column {
             StepLabel("SETUP_02")
             Text("USAGE ACCESS", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(12.dp))
-            Text("So we can show how much time you spend in each app. We never share this data.",
-                style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextSecondary,
-                modifier = Modifier.border(1.dp, SbbColors.Border).padding(10.dp))
+            Text(
+                "So we can show how much time you spend in each app. We never share this data.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SbbColors.TextSecondary,
+                modifier = Modifier
+                    .border(1.dp, SbbColors.Border)
+                    .padding(10.dp),
+            )
             Spacer(Modifier.height(24.dp))
             Column(
-                modifier = Modifier.border(1.dp, SbbColors.Border).padding(16.dp),
+                modifier = Modifier
+                    .border(1.dp, SbbColors.Border)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text("WHAT WE READ", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextMuted)
-                Text("▮ Time spent per app today\n▮ Number of times opened\n▯ Nothing else",
-                    style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextSecondary)
+                Text(
+                    "▮ Time spent per app today\n▮ Number of times opened\n▯ Nothing else",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = SbbColors.TextSecondary,
+                )
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!isGranted) {
                 OnboardingButton("[ GRANT PERMISSION → ]", onClick = onGrant)
-                Text("WAITING FOR PERMISSION...", style = MaterialTheme.typography.labelSmall,
-                    color = SbbColors.TextDim, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text(
+                    "WAITING FOR PERMISSION...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = SbbColors.TextDim,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
             } else {
                 OnboardingButton("[ PERMISSION GRANTED — NEXT → ]", onClick = onNext, highlight = true)
             }
@@ -233,19 +287,31 @@ private fun StepUsagePermission(isGranted: Boolean, onGrant: () -> Unit, onNext:
 
 @Composable
 private fun StepDefaultLauncher(isDefault: Boolean, onSet: () -> Unit, onNext: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column {
             StepLabel("SETUP_03")
             Text("SET AS DEFAULT", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(12.dp))
-            Text("We'll open Settings. Select this app under Home App.",
-                style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextSecondary,
-                modifier = Modifier.border(1.dp, SbbColors.Border).padding(10.dp))
+            Text(
+                "We'll open Settings. Select this app under Home App.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SbbColors.TextSecondary,
+                modifier = Modifier
+                    .border(1.dp, SbbColors.Border)
+                    .padding(10.dp),
+            )
             Spacer(Modifier.height(24.dp))
-            Column(modifier = Modifier.border(1.dp, SbbColors.Border).padding(16.dp)) {
+            Column(modifier = Modifier
+                .border(1.dp, SbbColors.Border)
+                .padding(16.dp)) {
                 listOf("Settings → Apps", "→ Default Apps", "→ Home App", "→ StopBreathBe").forEachIndexed { i, line ->
-                    Text(line, style = MaterialTheme.typography.bodyLarge,
-                        color = if (i == 3) SbbColors.PlantGreen else SbbColors.TextSecondary)
+                    Text(
+                        line,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (i == 3) SbbColors.PlantGreen else SbbColors.TextSecondary,
+                    )
                     if (i < 3) Spacer(Modifier.height(4.dp))
                 }
             }
@@ -253,8 +319,12 @@ private fun StepDefaultLauncher(isDefault: Boolean, onSet: () -> Unit, onNext: (
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (!isDefault) {
                 OnboardingButton("[ OPEN SETTINGS → ]", onClick = onSet)
-                Text("WAITING FOR DEFAULT...", style = MaterialTheme.typography.labelSmall,
-                    color = SbbColors.TextDim, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text(
+                    "WAITING FOR DEFAULT...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = SbbColors.TextDim,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
             } else {
                 OnboardingButton("[ DEFAULT SET — NEXT → ]", onClick = onNext, highlight = true)
             }
@@ -268,38 +338,37 @@ private fun StepDefaultLauncher(isDefault: Boolean, onSet: () -> Unit, onNext: (
 private fun StepPinnedApps(
     allApps: List<AppInfo>,
     pinned: List<String>,
-    onToggle: (String) -> Unit,
+    selectedSlot: Int,
+    onSlotTap: (Int) -> Unit,
+    onAppSelected: (String) -> Unit,
     onNext: () -> Unit,
 ) {
-    var selectedIndex by remember { mutableIntStateOf(0) }
+    var scrollIndex by remember { mutableIntStateOf(0) }
     val remaining = 4 - pinned.size
 
-    Column(modifier = Modifier.fillMaxSize().background(SbbColors.Background)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(SbbColors.Background)) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            StepLabel("SETUP_05")
+            StepLabel("SETUP_04")
             Text("PICK 4 DOCK APPS", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Your always-visible shortcuts.", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextSecondary)
+            Text(
+                "Tap a slot to select it, then tap an app to assign it.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SbbColors.TextSecondary,
+            )
             Spacer(Modifier.height(12.dp))
 
-            // Dock preview
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                repeat(4) { i ->
-                    val pkg = pinned.getOrNull(i)
-                    val label = allApps.find { it.packageName == pkg }?.label?.take(3) ?: "?"
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .border(2.dp, if (pkg != null) SbbColors.PlantGreen else SbbColors.Border)
-                            .background(if (pkg != null) SbbColors.GoalGreenBg else SbbColors.Surface),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(if (pkg != null) label.uppercase() else "?",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (pkg != null) SbbColors.PlantGreen else SbbColors.TextDim)
-                    }
-                }
-            }
+            // Dock preview slots
+            val pinnedAppInfos = List(4) { i -> allApps.find { it.packageName == pinned.getOrNull(i) } }
+
+            Dock(
+                pinnedApps   = pinnedAppInfos,
+                onAppClick   = { },
+                selectedSlot = selectedSlot,
+                onSlotTap    = onSlotTap,
+            )
         }
 
         Divider()
@@ -307,21 +376,16 @@ private fun StepPinnedApps(
         Box(modifier = Modifier.weight(1f)) {
             LineWheelScroll(
                 items          = allApps,
-                selectedIndex  = selectedIndex,
-                onItemSelected = { selectedIndex = it },
+                selectedIndex  = scrollIndex,
+                onItemSelected = { scrollIndex = it },
             ) { app, isFocused, scale ->
                 val isPinned = pinned.contains(app.packageName)
                 AppRow(
                     app       = app,
-                    flag      = AppFlag.NONE,
+                    flag      = if (isPinned) AppFlag.NONE else AppFlag.NONE,
                     isFocused = isFocused,
                     scale     = scale,
-                    onClick   = { onToggle(app.packageName) },
-                    hint      = when {
-                        isFocused && isPinned     -> "PINNED ✓ — TAP TO REMOVE"
-                        isFocused && !isPinned    -> "TAP TO PIN"
-                        else -> null
-                    },
+                    onClick   = { onAppSelected(app.packageName) },
                 )
             }
         }
@@ -339,7 +403,7 @@ private fun StepPinnedApps(
     }
 }
 
-// ── Step 6: Watch list ────────────────────────────────────────────────────────
+// ── Step 5: Watch list ────────────────────────────────────────────────────────
 
 @Composable
 private fun StepWatchList(
@@ -349,26 +413,34 @@ private fun StepWatchList(
     onNext: () -> Unit,
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
+    var localWatchList by remember { mutableStateOf(watchList) }
 
-    Column(modifier = Modifier.fillMaxSize().background(SbbColors.Background)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(SbbColors.Background)) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            StepLabel("SETUP_06")
+            StepLabel("SETUP_05")
             Text("WATCH LIST", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Apps you want to use less. You'll get a nudge before opening these.",
-                style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextSecondary)
+            Text(
+                "Apps you want to use less. You'll get a nudge before opening these.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SbbColors.TextSecondary,
+            )
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                watchList.take(4).forEach { pkg ->
-                    val label = allApps.find { it.packageName == pkg }?.label?.take(8) ?: pkg.take(6)
-                    Box(modifier = Modifier
-                        .background(SbbColors.WatchRedBg)
-                        .border(1.dp, SbbColors.WatchRedBorder)
-                        .padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = SbbColors.WatchRed)
-                    }
-                }
-            }
+
+
+            AppIconStrip(
+                packages  = localWatchList,
+                allApps   = allApps,
+                chipBg    = SbbColors.WatchRedBg,
+                chipColor = SbbColors.TextPrimary,
+                onRemove  = { pkg ->
+                    localWatchList = localWatchList - pkg
+                    onToggle(pkg) // update ViewModel
+                },
+                modifier  = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
         }
 
         Divider()
@@ -386,7 +458,10 @@ private fun StepWatchList(
                     flag      = if (isWatched) AppFlag.WATCH else AppFlag.NONE,
                     isFocused = isFocused,
                     scale     = scale,
-                    onClick   = { onToggle(app.packageName) },
+                    onClick   = {
+                        onToggle(app.packageName)
+                        localWatchList = localWatchList + app.packageName
+                    },
                     hint      = when {
                         isFocused && isWatched  -> "WATCH ✓ — TAP TO REMOVE"
                         isFocused && !isWatched -> "TAP TO ADD TO WATCH LIST"
@@ -399,26 +474,81 @@ private fun StepWatchList(
         Divider()
 
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OnboardingButton(
-                label  = "[ FINISH ]",
-                onClick = onNext,
-            )
+            OnboardingButton(label = "[ FINISH ]", onClick = onNext)
             Text(
                 "OR SKIP FOR NOW",
                 style    = MaterialTheme.typography.labelSmall,
                 color    = SbbColors.TextDim,
-                modifier = Modifier.align(Alignment.CenterHorizontally).clickable { onNext() },
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clickable { onNext() },
             )
         }
     }
 }
 
-// ── Done screen ────────────────────────────────────────────────────────────────
+// ── Step 6: Daily Limit ────────────────────────────────────────────────────────
+
+@Composable
+private fun StepDailyLimit(
+    onSet: (Int) -> Unit,
+    onNext: () -> Unit,
+) {
+    var minutes by remember { mutableIntStateOf(120) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column {
+            StepLabel("SETUP_06")
+            Text(
+                "DAILY LIMIT",
+                style = MaterialTheme.typography.headlineLarge,
+                color = SbbColors.TextPrimary
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "How many minutes per day for your watch list?",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SbbColors.TextSecondary,
+                modifier = Modifier
+                    .border(1.dp, SbbColors.Border)
+                    .padding(10.dp),
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            DailyLimitRow(
+                minutes = minutes,
+                onMinutesChange = { newValue ->
+                    minutes = newValue.toInt()
+                    onSet(newValue.toInt())
+                }
+            )
+        }
+
+        OnboardingButton(
+            "[ SET LIMIT → ]",
+            onClick = {
+                onSet(minutes)
+                onNext()
+            },
+            highlight = true
+        )
+    }
+}
+
+// ── Done screen ───────────────────────────────────────────────────────────────
 
 @Composable
 private fun StepDone(onLaunch: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -430,9 +560,11 @@ private fun StepDone(onLaunch: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             Text("YOU'RE SET.", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(8.dp))
-            Text("Your plant is alive.\nKeep it that way.",
+            Text(
+                "Your plant is alive.\nKeep it that way.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = SbbColors.TextSecondary)
+                color = SbbColors.TextSecondary,
+            )
         }
         OnboardingButton("[ LAUNCH → ]", onClick = onLaunch, highlight = true)
     }
@@ -481,11 +613,13 @@ private fun OnboardingButton(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (highlight) SbbColors.GoalGreenBg else SbbColors.Surface)
-            .border(2.dp, when {
-                !enabled  -> SbbColors.Border
-                highlight -> SbbColors.PlantGreen
-                else      -> SbbColors.BorderStrong
-            })
+            .border(
+                2.dp, when {
+                    !enabled -> SbbColors.Border
+                    highlight -> SbbColors.PlantGreen
+                    else -> SbbColors.BorderStrong
+                }
+            )
             .then(if (enabled) Modifier.clickable { onClick() } else Modifier)
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center,
@@ -502,6 +636,12 @@ private fun OnboardingButton(
     }
 }
 
-private fun Modifier.border(start: Int = 0, color: Color) = this.then(
-    Modifier.padding(start = start.dp)
-)
+@Composable
+private fun Divider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(SbbColors.Border)
+    )
+}

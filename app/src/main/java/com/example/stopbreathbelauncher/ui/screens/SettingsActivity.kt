@@ -1,6 +1,7 @@
 package com.example.stopbreathbelauncher.ui.screens
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -12,8 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.stopbreathbelauncher.ui.components.AppFlag
 import com.example.stopbreathbelauncher.ui.components.AppIconSlot
+import com.example.stopbreathbelauncher.ui.components.DailyLimitRow
 import com.example.stopbreathbelauncher.ui.theme.SbbColors
 import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
 import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
@@ -122,14 +122,6 @@ fun SettingsScreen(
     var limitSlider by remember(prefs.dailyLimitMinutes) {
         mutableFloatStateOf(prefs.dailyLimitMinutes.toFloat())
     }
-    var sliderInitialized by remember { mutableStateOf(false) }
-
-    LaunchedEffect(prefs.dailyLimitMinutes) {
-        if (!sliderInitialized) {
-            limitSlider = prefs.dailyLimitMinutes.toFloat()
-            sliderInitialized = true
-        }
-    }
 
     // Dock picker overlay
     showDockPicker?.let { slotIndex ->
@@ -191,43 +183,21 @@ fun SettingsScreen(
 
         // Limit scrubber
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            val hrs     = (limitSlider / 60).toInt()
-            val mins    = (limitSlider % 60).toInt()
+            val hrs = (limitSlider / 60).toInt()
+            val mins = (limitSlider % 60).toInt()
             val display = if (hrs > 0) "${hrs}H ${mins}M" else "${mins}M"
+
             Text(
-                text  = "Nudge me after $display total on watch list apps per day",
+                text = "Nudge me after $display total on watch list apps per day",
                 style = MaterialTheme.typography.labelLarge,
                 color = SbbColors.TextSecondary,
             )
             Spacer(Modifier.height(8.dp))
-            Row(
-                verticalAlignment   = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("30M", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextDim)
-                Slider(
-                    value                 = limitSlider,
-                    onValueChange         = { limitSlider = it },
-                    onValueChangeFinished = { viewModel.setDailyLimitMinutes(limitSlider.roundToInt()) },
-                    valueRange            = 30f..240f,
-                    steps                 = 13,
-                    modifier              = Modifier.weight(1f),
-                    colors                = SliderDefaults.colors(
-                        thumbColor         = SbbColors.PlantGreen,
-                        activeTrackColor   = SbbColors.PlantGreenDark,
-                        inactiveTrackColor = SbbColors.Border,
-                    ),
-                )
-                Text("4H", style = MaterialTheme.typography.labelLarge, color = SbbColors.TextDim)
-                Text(
-                    display,
-                    style    = MaterialTheme.typography.titleLarge,
-                    color    = SbbColors.PlantGreen,
-                    modifier = Modifier.width(48.dp),
-                )
-            }
+            DailyLimitRow(
+                minutes = limitSlider.roundToInt(),
+                onMinutesChange = { viewModel.setDailyLimitMinutes(it.toInt()) }
+            )
         }
-
         SectionDivider()
 
         // ── Pinned Dock ──────────────────────────────────────────────────────

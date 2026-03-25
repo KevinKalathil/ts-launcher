@@ -22,6 +22,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
+import com.example.stopbreathbelauncher.ui.viewmodel.LauncherViewModel
 
 // ── Homescreen ────────────────────────────────────────────────────────────────
 
@@ -67,13 +68,9 @@ fun HomeScreen(
                 verticalAlignment = Alignment.Top,
             ) {
                 Text(
-                    text = "${formatUsageTime(state.totalWatchListUsageMs)} / ${"%.2g".format(state.preferences.dailyLimitMinutes / 60f)}H",
+                    text = "${LauncherViewModel.formatUsageTime(state.totalWatchListUsageMs)} / ${"%.2g".format(state.preferences.dailyLimitMinutes / 60f)}H",
                     style = MaterialTheme.typography.labelLarge,
-                    color = when {
-                        totalProportion >= 0.9f -> SbbColors.WatchRed
-                        totalProportion >= 0.6f -> SbbColors.WatchOrange
-                        else                    -> SbbColors.TextSecondary
-                    },
+                    color = LauncherViewModel.getUsageColor(proportion = totalProportion),
                 )
                 Text(
                     text     = "[⚙]",
@@ -276,6 +273,8 @@ fun AllAppsScreen(
 fun Dock(
     pinnedApps: List<AppInfo?>,
     onAppClick: (AppInfo) -> Unit,
+    selectedSlot: Int? = null,
+    onSlotTap: ((Int) -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -285,27 +284,36 @@ fun Dock(
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        pinnedApps.forEach { app ->
+        pinnedApps.forEachIndexed { i, app ->
+            val isSelected = i == selectedSlot
             if (app != null) {
-                DockSlot(app = app, onClick = { onAppClick(app) })
+                DockSlot(
+                    app         = app,
+                    onClick     = { onSlotTap?.invoke(i) ?: onAppClick(app) },
+                    isSelected  = isSelected,
+                )
             } else {
-                EmptyDockSlot()
+                EmptyDockSlot(
+                    isSelected = isSelected,
+                    onClick    = { onSlotTap?.invoke(i) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun DockSlot(app: AppInfo, onClick: () -> Unit) {
+private fun DockSlot(app: AppInfo, onClick: () -> Unit, isSelected: Boolean = false) {
     AppIconSlot(
-        app     = app,
-        size    = 52.dp,
-        onClick = onClick,
+        app        = app,
+        size       = 52.dp,
+        onClick    = onClick,
+        isSelected = isSelected,
     )
 }
 
 @Composable
-private fun EmptyDockSlot() {
+private fun EmptyDockSlot(isSelected: Boolean = false, onClick: () -> Unit = {}) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -313,10 +321,16 @@ private fun EmptyDockSlot() {
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .border(2.dp, SbbColors.Border),
+                .border(2.dp, if (isSelected) SbbColors.TextPrimary else SbbColors.Border)
+                .background(if (isSelected) SbbColors.Surface else Color.Transparent)
+                .clickable { onClick() },
             contentAlignment = Alignment.Center,
         ) {
-            Text("?", style = MaterialTheme.typography.bodyLarge, color = SbbColors.TextDim)
+            Text(
+                if (isSelected) "▮" else "?",
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (isSelected) SbbColors.TextPrimary else SbbColors.TextDim,
+            )
         }
         Text("—", style = MaterialTheme.typography.labelSmall, color = SbbColors.Border)
     }
