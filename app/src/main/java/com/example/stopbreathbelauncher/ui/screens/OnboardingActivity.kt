@@ -214,7 +214,7 @@ private fun StepWelcome(onNext: () -> Unit) {
     ) {
         Column {
             Spacer(Modifier.height(8.dp))
-            Text("Tend", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
+            Text("TimeSpent", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(16.dp))
             Text(
                 "A launcher that makes every app launch a conscious choice.\nTakes 2 minutes to set up.",
