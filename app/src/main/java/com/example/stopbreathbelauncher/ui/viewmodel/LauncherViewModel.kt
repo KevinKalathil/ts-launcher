@@ -191,33 +191,36 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val startMs = todayStartMs()
         val endMs = System.currentTimeMillis()
         val usageMap = mutableMapOf<String, Long>()
-        val resumeMap = mutableMapOf<String, Long>()
+        // Key is (packageName, className) to handle multi-activity packages
+        val resumeMap = mutableMapOf<Pair<String, String>, Long>()
 
         val events = usm.queryEvents(startMs, endMs)
         val event = android.app.usage.UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
+            val key = event.packageName to event.className
             when (event.eventType) {
                 android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> {
-                    resumeMap[event.packageName] = event.timeStamp
+                    resumeMap[key] = event.timeStamp
                 }
                 android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
-                    val resumeTime = resumeMap.remove(event.packageName)
+                    val resumeTime = resumeMap.remove(key)
                     if (resumeTime != null) {
-                        usageMap[event.packageName] = (usageMap[event.packageName] ?: 0L) + (event.timeStamp - resumeTime)
+                        usageMap[event.packageName] =
+                            (usageMap[event.packageName] ?: 0L) + (event.timeStamp - resumeTime)
                     }
                 }
             }
         }
 
-        // Close any still-open sessions
-        resumeMap.forEach { (pkg, resumeTime) ->
+        // Close any still-open sessions, aggregating back to package
+        resumeMap.forEach { (key, resumeTime) ->
+            val (pkg, _) = key
             usageMap[pkg] = (usageMap[pkg] ?: 0L) + (endMs - resumeTime)
         }
 
         return usageMap
     }
-
     private fun getTodayOpenCounts(): Map<String, Int> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val counts = mutableMapOf<String, Int>()
