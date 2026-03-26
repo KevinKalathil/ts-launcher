@@ -457,11 +457,6 @@ private fun StepWatchList(
                         onToggle(app.packageName)
                         localWatchList = localWatchList + app.packageName
                     },
-                    hint      = when {
-                        isFocused && isWatched  -> "WATCH ✓ — TAP TO REMOVE"
-                        isFocused && !isWatched -> "TAP TO ADD TO WATCH LIST"
-                        else -> null
-                    },
                 )
             }
         }
@@ -614,7 +609,7 @@ private fun OnboardingButton(
     ) {
         Text(
             text  = label,
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = when {
                 !enabled  -> SbbColors.TextDim
                 highlight -> SbbColors.PlantGreen

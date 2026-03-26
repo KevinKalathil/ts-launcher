@@ -223,7 +223,7 @@ fun SbbButton(
     ) {
         Text(
             text  = label,
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = color,
         )
     }
