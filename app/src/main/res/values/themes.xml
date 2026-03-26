@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.StopBreathBeLauncher" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="Theme.TimeSpent" parent="Theme.MaterialComponents.NoActionBar">
         <item name="android:windowBackground">@color/sbb_background</item>
         <item name="android:statusBarColor">@color/sbb_background</item>
         <item name="android:navigationBarColor">@color/sbb_background</item>
