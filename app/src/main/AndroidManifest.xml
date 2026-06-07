@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.stopbreathbelauncher">
+    package="com.app.timespentlauncher">
 
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
@@ -29,7 +29,7 @@
         <activity
             android:exported="true"
             android:screenOrientation="portrait"
-            android:name="com.example.stopbreathbelauncher.ui.screens.OnboardingActivity">
+            android:name="com.app.timespentlauncher.ui.screens.OnboardingActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -42,7 +42,7 @@
             android:screenOrientation="portrait"
             android:launchMode="singleTask"
             android:stateNotNeeded="true"
-            android:name="com.example.stopbreathbelauncher.ui.screens.LauncherActivity">
+            android:name="com.app.timespentlauncher.ui.screens.LauncherActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
@@ -54,7 +54,7 @@
         <activity
             android:exported="false"
             android:screenOrientation="portrait"
-            android:name="com.example.stopbreathbelauncher.ui.screens.SettingsActivity" />
+            android:name="com.app.timespentlauncher.ui.screens.SettingsActivity" />
 
     </application>
 

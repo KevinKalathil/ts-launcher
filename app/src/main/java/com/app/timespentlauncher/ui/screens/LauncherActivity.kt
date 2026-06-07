@@ -1,8 +1,8 @@
-package com.example.stopbreathbelauncher.ui.screens
+package com.app.timespentlauncher.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -12,12 +12,12 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import com.example.stopbreathbelauncher.ui.components.AppFlag
-import com.example.stopbreathbelauncher.ui.components.NudgeDialog
-import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
-import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
-import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
-import com.example.stopbreathbelauncher.ui.viewmodel.LauncherViewModel
+import com.app.timespentlauncher.ui.components.AppFlag
+import com.app.timespentlauncher.ui.components.NudgeDialog
+import com.app.timespentlauncher.ui.theme.SbbScaffold
+import com.app.timespentlauncher.ui.theme.StopBreathBeLauncherTheme
+import com.app.timespentlauncher.ui.viewmodel.AppInfo
+import com.app.timespentlauncher.ui.viewmodel.LauncherViewModel
 
 class LauncherActivity : ComponentActivity() {
 
@@ -40,19 +40,19 @@ class LauncherActivity : ComponentActivity() {
                     ) { page ->
                         when (page) {
                             0 -> HomeScreen(
-                                state          = uiState,
-                                onAppClick     = { app -> handleAppClick(app) },
+                                state = uiState,
+                                onAppClick = { app -> handleAppClick(app) },
                                 onAppLongClick = { app -> toggleFlag(app) },
-                                onSetFlag      = { app, flag -> setFlag(app, flag) },
-                                onUninstall    = { app -> uninstallApp(app) },
+                                onSetFlag = { app, flag -> setFlag(app, flag) },
+                                onUninstall = { app -> uninstallApp(app) },
                                 onSettingsClick = { openSettings() },
                             )
                             1 -> AllAppsScreen(
-                                state          = uiState,
-                                onAppClick     = { app -> handleAppClick(app) },
+                                state = uiState,
+                                onAppClick = { app -> handleAppClick(app) },
                                 onAppLongClick = { app -> toggleFlag(app) },
-                                onSetFlag      = { app, flag -> setFlag(app, flag) },
-                                onUninstall    = { app -> uninstallApp(app) },
+                                onSetFlag = { app, flag -> setFlag(app, flag) },
+                                onUninstall = { app -> uninstallApp(app) },
                             )
                         }
                     }
@@ -119,7 +119,7 @@ class LauncherActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun uninstallApp(app: AppInfo) {
         val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
-            data = android.net.Uri.parse("package:${app.packageName}")
+            data = Uri.parse("package:${app.packageName}")
             putExtra(Intent.EXTRA_RETURN_RESULT, true)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }

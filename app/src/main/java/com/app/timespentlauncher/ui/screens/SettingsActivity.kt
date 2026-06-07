@@ -1,7 +1,6 @@
-package com.example.stopbreathbelauncher.ui.screens
+package com.app.timespentlauncher.ui.screens
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -19,14 +18,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.stopbreathbelauncher.ui.components.AppFlag
-import com.example.stopbreathbelauncher.ui.components.AppIconSlot
-import com.example.stopbreathbelauncher.ui.components.DailyLimitRow
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
-import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
-import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
-import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
-import com.example.stopbreathbelauncher.ui.viewmodel.LauncherViewModel
+import com.app.timespentlauncher.ui.components.AppFlag
+import com.app.timespentlauncher.ui.components.AppIconSlot
+import com.app.timespentlauncher.ui.components.AppRow
+import com.app.timespentlauncher.ui.components.DailyLimitRow
+import com.app.timespentlauncher.ui.scroll.LineWheelScroll
+import com.app.timespentlauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.ui.theme.SbbScaffold
+import com.app.timespentlauncher.ui.theme.StopBreathBeLauncherTheme
+import com.app.timespentlauncher.ui.viewmodel.AppInfo
+import com.app.timespentlauncher.ui.viewmodel.LauncherUiState
+import com.app.timespentlauncher.ui.viewmodel.LauncherViewModel
 import kotlin.math.roundToInt
 
 class SettingsActivity : ComponentActivity() {
@@ -109,7 +111,7 @@ fun AppIconStrip(
 
 @Composable
 fun SettingsScreen(
-    uiState: com.example.stopbreathbelauncher.ui.viewmodel.LauncherUiState,
+    uiState: LauncherUiState,
     viewModel: LauncherViewModel,
     onBack: () -> Unit,
 ) {
@@ -342,17 +344,17 @@ fun AppPickerScreen(
         Divider()
 
         Box(modifier = Modifier.weight(1f)) {
-            com.example.stopbreathbelauncher.ui.scroll.LineWheelScroll(
+            LineWheelScroll(
                 items          = apps,
                 selectedIndex  = selectedIndex,
                 onItemSelected = { selectedIndex = it },
                 thumbColor     = SbbColors.TextSecondary,
             ) { app, isFocused, scale ->
-                com.example.stopbreathbelauncher.ui.components.AppRow(
-                    app       = app,
+                AppRow(
+                    app = app,
                     isFocused = isFocused,
-                    scale     = scale,
-                    onClick   = { onPick(app) },
+                    scale = scale,
+                    onClick = { onPick(app) },
                 )
             }
         }
@@ -465,7 +467,7 @@ fun AddAppPickerScreen(
         Divider()
 
         Box(modifier = Modifier.weight(1f)) {
-            com.example.stopbreathbelauncher.ui.scroll.LineWheelScroll(
+            LineWheelScroll(
                 items          = apps,
                 selectedIndex  = selectedIndex,
                 onItemSelected = { selectedIndex = it },
@@ -473,12 +475,12 @@ fun AddAppPickerScreen(
             ) { app, isFocused, scale ->
                 val existingFlag  = if (app.packageName in localWatchList) AppFlag.WATCH else AppFlag.NONE
                 val alreadyAdded  = existingFlag == currentTarget
-                com.example.stopbreathbelauncher.ui.components.AppRow(
-                    app       = app,
-                    flag      = existingFlag,
+                AppRow(
+                    app = app,
+                    flag = existingFlag,
                     isFocused = isFocused,
-                    scale     = scale,
-                    onClick   = { if (!alreadyAdded) onAdd(app) },
+                    scale = scale,
+                    onClick = { if (!alreadyAdded) onAdd(app) },
                 )
             }
         }

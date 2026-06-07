@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.components
+package com.app.timespentlauncher.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,9 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
-import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
+import com.app.timespentlauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.ui.viewmodel.AppInfo
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.clickable
 
@@ -43,8 +42,8 @@ fun NudgeDialog(
 
     val nudgeMessage = when {
         limitPct >= 100 -> "You've hit your limit. Still opening this?"
-        limitPct >= 75  -> "You've used ${app.openCount}x today. Still worth it?"
-        else            -> "You've opened this ${app.openCount} times today."
+        limitPct >= 75  -> "Opened ${app.openCount}x today. Still worth it?"
+        else            -> "You've opened this ${app.openCount} today."
     }
 
     Box(

@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.theme
+package com.app.timespentlauncher.ui.theme
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,7 +17,7 @@ import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
-import com.example.stopbreathbelauncher.R
+import com.app.timespentlauncher.R
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 

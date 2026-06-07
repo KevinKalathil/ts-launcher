@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.components
+package com.app.timespentlauncher.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -8,16 +8,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
-import kotlin.math.roundToInt
+import com.app.timespentlauncher.ui.theme.SbbColors
 
 @Composable
 fun DailyLimitRow(

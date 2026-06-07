@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.screens
+package com.app.timespentlauncher.ui.screens
 
 import android.app.AppOpsManager
 import android.content.ComponentName
@@ -7,7 +7,6 @@ import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -22,17 +21,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import com.example.stopbreathbelauncher.data.PlantState
-import com.example.stopbreathbelauncher.ui.components.AppFlag
-import com.example.stopbreathbelauncher.ui.components.AppRow
-import com.example.stopbreathbelauncher.ui.components.DailyLimitRow
-import com.example.stopbreathbelauncher.ui.components.PlantDisplay
-import com.example.stopbreathbelauncher.ui.scroll.LineWheelScroll
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
-import com.example.stopbreathbelauncher.ui.theme.SbbScaffold
-import com.example.stopbreathbelauncher.ui.theme.StopBreathBeLauncherTheme
-import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
-import com.example.stopbreathbelauncher.ui.viewmodel.LauncherViewModel
+import com.app.timespentlauncher.data.PlantState
+import com.app.timespentlauncher.ui.components.AppFlag
+import com.app.timespentlauncher.ui.components.AppRow
+import com.app.timespentlauncher.ui.components.DailyLimitRow
+import com.app.timespentlauncher.ui.components.PlantDisplay
+import com.app.timespentlauncher.ui.scroll.LineWheelScroll
+import com.app.timespentlauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.ui.theme.SbbScaffold
+import com.app.timespentlauncher.ui.theme.StopBreathBeLauncherTheme
+import com.app.timespentlauncher.ui.viewmodel.AppInfo
+import com.app.timespentlauncher.ui.viewmodel.LauncherViewModel
 import kotlinx.coroutines.launch
 
 class OnboardingActivity : ComponentActivity() {
@@ -214,7 +213,7 @@ private fun StepWelcome(onNext: () -> Unit) {
     ) {
         Column {
             Spacer(Modifier.height(8.dp))
-            Text("TimeSpent", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
+            Text("Time Spent Launcher", style = MaterialTheme.typography.headlineLarge, color = SbbColors.TextPrimary)
             Spacer(Modifier.height(16.dp))
             Text(
                 "A launcher that makes every app launch a conscious choice.\nTakes 2 minutes to set up.",
@@ -303,7 +302,7 @@ private fun StepDefaultLauncher(isDefault: Boolean, onSet: () -> Unit, onNext: (
             Column(modifier = Modifier
                 .border(1.dp, SbbColors.Border)
                 .padding(16.dp)) {
-                listOf("Settings → Apps", "→ Default Apps", "→ Home App", "→ StopBreathBe").forEachIndexed { i, line ->
+                listOf("Settings → Apps", "→ Default Apps", "→ Home App", "→ Time Spent Launcher").forEachIndexed { i, line ->
                     Text(
                         line,
                         style = MaterialTheme.typography.bodyLarge,
@@ -360,10 +359,10 @@ private fun StepPinnedApps(
             val pinnedAppInfos = List(4) { i -> allApps.find { it.packageName == pinned.getOrNull(i) } }
 
             Dock(
-                pinnedApps   = pinnedAppInfos,
-                onAppClick   = { },
+                pinnedApps = pinnedAppInfos,
+                onAppClick = { },
                 selectedSlot = selectedSlot,
-                onSlotTap    = onSlotTap,
+                onSlotTap = onSlotTap,
             )
         }
 
@@ -426,15 +425,15 @@ private fun StepWatchList(
 
 
             AppIconStrip(
-                packages  = localWatchList,
-                allApps   = allApps,
-                chipBg    = SbbColors.WatchRedBg,
+                packages = localWatchList,
+                allApps = allApps,
+                chipBg = SbbColors.WatchRedBg,
                 chipColor = SbbColors.TextPrimary,
-                onRemove  = { pkg ->
+                onRemove = { pkg ->
                     localWatchList = localWatchList - pkg
                     onToggle(pkg) // update ViewModel
                 },
-                modifier  = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
             )
         }
 

@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.components
+package com.app.timespentlauncher.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -12,14 +12,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
-import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
+import com.app.timespentlauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.ui.viewmodel.AppInfo
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 
@@ -27,9 +27,9 @@ enum class AppFlag { NONE, WATCH }
 
 private data class Quad(
     val label: String,
-    val color: androidx.compose.ui.graphics.Color,
-    val bg: androidx.compose.ui.graphics.Color,
-    val border: androidx.compose.ui.graphics.Color,
+    val color: Color,
+    val bg: Color,
+    val border: Color,
 )
 
 @Composable
@@ -225,9 +225,9 @@ fun AppRow(
 @Composable
 fun FlagBadge(
     label: String,
-    textColor: androidx.compose.ui.graphics.Color,
-    borderColor: androidx.compose.ui.graphics.Color,
-    bgColor: androidx.compose.ui.graphics.Color,
+    textColor: Color,
+    borderColor: Color,
+    bgColor: Color,
 ) {
     Box(
         modifier = Modifier

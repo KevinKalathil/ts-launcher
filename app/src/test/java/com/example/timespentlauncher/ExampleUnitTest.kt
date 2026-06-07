@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher
+package com.example.timespentlauncher
 
 import org.junit.Test
 

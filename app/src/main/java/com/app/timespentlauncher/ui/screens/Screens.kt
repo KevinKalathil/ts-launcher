@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.screens
+package com.app.timespentlauncher.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,18 +11,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.stopbreathbelauncher.data.PlantState
-import com.example.stopbreathbelauncher.ui.components.*
-import com.example.stopbreathbelauncher.ui.scroll.LineWheelScroll
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
-import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
-import com.example.stopbreathbelauncher.ui.viewmodel.LauncherUiState
+import com.app.timespentlauncher.data.PlantState
+import com.app.timespentlauncher.ui.components.AppFlag
+import com.app.timespentlauncher.ui.components.AppIconSlot
+import com.app.timespentlauncher.ui.components.AppRow
+import com.app.timespentlauncher.ui.components.PlantDisplay
+import com.app.timespentlauncher.ui.scroll.LineWheelScroll
+import com.app.timespentlauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.ui.viewmodel.AppInfo
+import com.app.timespentlauncher.ui.viewmodel.LauncherUiState
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.graphics.drawable.toBitmap
-import com.example.stopbreathbelauncher.ui.viewmodel.LauncherViewModel
+import com.app.timespentlauncher.ui.viewmodel.LauncherViewModel
 
 // ── Homescreen ────────────────────────────────────────────────────────────────
 
@@ -107,20 +108,20 @@ fun HomeScreen(
                         else -> AppFlag.NONE
                     }
                     AppRow(
-                        app          = app,
-                        flag         = flag,
-                        isFocused    = isFocused,
-                        scale        = scale,
-                        showBar      = true,
+                        app = app,
+                        flag = flag,
+                        isFocused = isFocused,
+                        scale = scale,
+                        showBar = true,
                         totalUsageMs = totalUsageMs,
-                        onClick      = { onAppClick(app) },
+                        onClick = { onAppClick(app) },
                         onFlagChange = { newFlag ->
                             when (newFlag) {
                                 AppFlag.WATCH -> onSetFlag(app, AppFlag.WATCH)
-                                AppFlag.NONE  -> onSetFlag(app, AppFlag.NONE)
+                                AppFlag.NONE -> onSetFlag(app, AppFlag.NONE)
                             }
                         },
-                        onUninstall  = { onUninstall(app) },
+                        onUninstall = { onUninstall(app) },
                     )
                 }
             }
@@ -249,19 +250,19 @@ fun AllAppsScreen(
                     else -> AppFlag.NONE
                 }
                 AppRow(
-                    app          = app,
-                    flag         = flag,
-                    isFocused    = isFocused,
-                    scale        = scale,
-                    showBar      = true,
-                    onClick      = { onAppClick(app) },
+                    app = app,
+                    flag = flag,
+                    isFocused = isFocused,
+                    scale = scale,
+                    showBar = true,
+                    onClick = { onAppClick(app) },
                     onFlagChange = { newFlag ->
                         when (newFlag) {
                             AppFlag.WATCH -> onSetFlag(app, AppFlag.WATCH)
-                            AppFlag.NONE  -> onSetFlag(app, AppFlag.NONE)
+                            AppFlag.NONE -> onSetFlag(app, AppFlag.NONE)
                         }
                     },
-                    onUninstall  = { onUninstall(app) },
+                    onUninstall = { onUninstall(app) },
                 )
             }
         }
@@ -305,9 +306,9 @@ fun Dock(
 @Composable
 private fun DockSlot(app: AppInfo, onClick: () -> Unit, isSelected: Boolean = false) {
     AppIconSlot(
-        app        = app,
-        size       = 52.dp,
-        onClick    = onClick,
+        app = app,
+        size = 52.dp,
+        onClick = onClick,
         isSelected = isSelected,
     )
 }

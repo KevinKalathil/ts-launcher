@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.data
+package com.app.timespentlauncher.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.*

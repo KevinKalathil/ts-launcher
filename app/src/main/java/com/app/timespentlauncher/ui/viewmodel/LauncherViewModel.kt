@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.viewmodel
+package com.app.timespentlauncher.ui.viewmodel
 
 import android.app.AppOpsManager
 import android.app.Application
@@ -8,12 +8,18 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
+import android.net.Uri
 import android.os.Process
+import android.provider.MediaStore
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.stopbreathbelauncher.data.*
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.data.PlantState
+import com.app.timespentlauncher.data.StreakData
+import com.app.timespentlauncher.data.StreakRepository
+import com.app.timespentlauncher.data.UserPreferences
+import com.app.timespentlauncher.data.UserPreferencesRepository
+import com.app.timespentlauncher.ui.theme.SbbColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -127,9 +133,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
                 val defaults = listOfNotNull(
                     resolveDefault(Intent(Intent.ACTION_DIAL)),
-                    resolveDefault(Intent(Intent.ACTION_SENDTO).apply { data = android.net.Uri.parse("smsto:") }),
-                    resolveDefault(Intent(Intent.ACTION_VIEW).apply { data = android.net.Uri.parse("https://") }),
-                    resolveDefault(Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)),
+                    resolveDefault(Intent(Intent.ACTION_SENDTO).apply { data = Uri.parse("smsto:") }),
+                    resolveDefault(Intent(Intent.ACTION_VIEW).apply { data = Uri.parse("https://") }),
+                    resolveDefault(Intent(MediaStore.ACTION_IMAGE_CAPTURE)),
                 ).distinct().take(4)
 
                 if (defaults.isNotEmpty()) prefsRepo.setPinnedApps(defaults)
@@ -156,11 +162,20 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun onAppClicked(app: AppInfo) {
         val state = uiState.value
+        if (app.packageName !in state.preferences.watchList) return
+
         val limitMs = state.preferences.dailyLimitMinutes * 60 * 1000L
-        val proportion = if (limitMs > 0) app.usageTimeMs.toFloat() / limitMs else 0f
-        val usageStatus = getUsageStatus(proportion)
-        if (app.packageName in state.preferences.watchList &&
-            (usageStatus == UsageStatus.WARNING || usageStatus == UsageStatus.EXCEEDED)) {
+
+        // Per-app proportion
+        val appProportion = if (limitMs > 0) app.usageTimeMs.toFloat() / limitMs else 0f
+        // Total watchlist proportion
+        val totalProportion = if (limitMs > 0) state.totalWatchListUsageMs.toFloat() / limitMs else 0f
+
+        val appStatus = getUsageStatus(appProportion)
+        val totalStatus = getUsageStatus(totalProportion)
+
+        if (appStatus == UsageStatus.WARNING || appStatus == UsageStatus.EXCEEDED ||
+            totalStatus == UsageStatus.WARNING || totalStatus == UsageStatus.EXCEEDED) {
             _nudgeApp.value = app
         }
     }
@@ -196,54 +211,49 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private fun getTodayUsageStats(): Map<String, Long> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+
         val startMs = todayStartMs()
         val endMs = System.currentTimeMillis()
-        val usageMap = mutableMapOf<String, Long>()
-        // Key is (packageName, className) to handle multi-activity packages
-        val resumeMap = mutableMapOf<Pair<String, String>, Long>()
 
-        val events = usm.queryEvents(startMs, endMs)
-        val event = android.app.usage.UsageEvents.Event()
+        return usm
+            .queryAndAggregateUsageStats(startMs, endMs)
+            .mapValues { (_, stats) ->
+                stats.totalTimeInForeground
+            }
+    }
+
+    private fun getTodayOpenCounts(): Map<String, Int> {
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+
+        val counts = mutableMapOf<String, Int>()
+        val events = usm.queryEvents(todayStartMs(), System.currentTimeMillis())
+        val event = UsageEvents.Event()
+
+        var currentPackage: String? = null
+
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            val key = event.packageName to event.className
+
             when (event.eventType) {
-                android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> {
-                    resumeMap[key] = event.timeStamp
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    val pkg = event.packageName
+
+                    if (pkg != currentPackage) {
+                        counts[pkg] = (counts[pkg] ?: 0) + 1
+                        currentPackage = pkg
+                    }
                 }
-                android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
-                    val resumeTime = resumeMap.remove(key)
-                    if (resumeTime != null) {
-                        usageMap[event.packageName] =
-                            (usageMap[event.packageName] ?: 0L) + (event.timeStamp - resumeTime)
+
+                UsageEvents.Event.ACTIVITY_PAUSED -> {
+                    if (event.packageName == currentPackage) {
+                        currentPackage = null
                     }
                 }
             }
         }
 
-        // Close any still-open sessions, aggregating back to package
-        resumeMap.forEach { (key, resumeTime) ->
-            val (pkg, _) = key
-            usageMap[pkg] = (usageMap[pkg] ?: 0L) + (endMs - resumeTime)
-        }
-
-        return usageMap
-    }
-
-    private fun getTodayOpenCounts(): Map<String, Int> {
-        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val counts = mutableMapOf<String, Int>()
-        val events = usm.queryEvents(todayStartMs(), System.currentTimeMillis())
-        val event  = UsageEvents.Event()
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                counts[event.packageName] = (counts[event.packageName] ?: 0) + 1
-            }
-        }
         return counts
     }
-
     private fun getInstalledApps(
         usageMap: Map<String, Long>,
         openCounts: Map<String, Int>,

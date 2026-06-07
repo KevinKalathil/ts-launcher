@@ -1,17 +1,15 @@
-package com.example.stopbreathbelauncher.ui.components
+package com.app.timespentlauncher.ui.components
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.stopbreathbelauncher.data.PlantState
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.data.PlantState
+import com.app.timespentlauncher.ui.theme.SbbColors
 
 @Composable
 fun PlantDisplay(

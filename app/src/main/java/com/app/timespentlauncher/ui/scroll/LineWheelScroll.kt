@@ -1,4 +1,4 @@
-package com.example.stopbreathbelauncher.ui.scroll
+package com.app.timespentlauncher.ui.scroll
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.ui.theme.SbbColors
 import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyListPrefetchStrategy
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.Color
 
 private val ALPHABET = ('A'..'Z').toList()
 
@@ -33,7 +34,7 @@ fun <T> LineWheelScroll(
     items: List<T>,
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit,
-    thumbColor: androidx.compose.ui.graphics.Color = SbbColors.PlantGreen,
+    thumbColor: Color = SbbColors.PlantGreen,
     indexBar: Boolean = false,
     itemLabel: ((T) -> String)? = null,
     itemContent: @Composable (item: T, isFocused: Boolean, scale: Float) -> Unit
@@ -68,7 +69,7 @@ fun <T> LineWheelScroll(
                 .padding(start = 24.dp, end = if (indexBar) 56.dp else 16.dp),
         ) {
             itemsIndexed(items) { i, item ->
-                androidx.compose.foundation.layout.Box(Modifier.alpha(1f)) {
+                Box(Modifier.alpha(1f)) {
                     itemContent(item, i == focusedIndex, 1f)
                 }
             }

@@ -1,12 +1,10 @@
-package com.example.stopbreathbelauncher.ui.components
+package com.app.timespentlauncher.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,14 +20,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import com.example.stopbreathbelauncher.ui.theme.SbbColors
-import com.example.stopbreathbelauncher.ui.viewmodel.AppInfo
+import com.app.timespentlauncher.ui.theme.SbbColors
+import com.app.timespentlauncher.ui.viewmodel.AppInfo
 
 @Composable
 fun AppIconSlot(
     app: AppInfo?,
     size: Dp = 44.dp,
-    bgColor: androidx.compose.ui.graphics.Color = SbbColors.SurfaceVariant,
+    bgColor: Color = SbbColors.SurfaceVariant,
     badge: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     isSelected: Boolean = false,
